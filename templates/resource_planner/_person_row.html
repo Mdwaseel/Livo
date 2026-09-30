@@ -1,0 +1,40 @@
+{% comment %}
+One person's workload as a table row. Shared by the employee list and the
+department drill-down so the two can't drift.
+
+The status pill carries a text label as well as a colour — a red dot alone is
+unreadable to a colour-blind manager, and the numbers next to it are the real
+answer anyway.
+{% endcomment %}
+<tr>
+  <td>
+    <strong>{{ r.user.get_full_name|default:r.user.username }}</strong>
+    {% if r.unestimated_tasks %}
+      <span class="tag warn" title="{{ r.unestimated_tasks }} open task{{ r.unestimated_tasks|pluralize }} with no estimate — these hours are invisible to the numbers on this row">{{ r.unestimated_tasks }} unsized</span>
+    {% endif %}
+    <div class="cell-sub">{{ r.department.name|default:"No department" }}</div>
+  </td>
+  <td>{{ r.capacity|floatformat:"-2" }} h
+    {% if r.leave_hours > 0 %}<div class="cell-sub">&minus;{{ r.leave_hours|floatformat:"-2" }} h leave</div>{% endif %}
+  </td>
+  <td>{{ r.allocated_hours|floatformat:"-2" }} h
+    <div class="cell-sub">{{ r.logged_hours|floatformat:"-2" }} logged · {{ r.scheduled_hours|floatformat:"-2" }} planned</div>
+  </td>
+  <td class="{% if r.remaining_capacity < 0 %}num-over{% endif %}">
+    {{ r.remaining_capacity|floatformat:"-2" }} h</td>
+  <td>
+    <span class="meter" aria-hidden="true"><i class="u-{{ r.status }}"
+      style="width:{% if r.utilization_percent > 100 %}100{% else %}{{ r.utilization_percent|floatformat:'0' }}{% endif %}%"></i></span>
+    {{ r.utilization_percent|floatformat:"0" }}%
+  </td>
+  <td>{{ r.sprint_hours|floatformat:"-2" }} h</td>
+  <td>{{ r.future_hours|floatformat:"-2" }} h
+    {% if r.overdue_hours > 0 %}<div class="cell-sub num-over">{{ r.overdue_hours|floatformat:"-2" }} h overdue</div>{% endif %}
+  </td>
+  <td><span class="pill pill-{{ r.status }}">{{ r.status_label }}</span></td>
+  {% if can_edit_capacity %}
+  <td style="text-align:right">
+    <a class="link-act" href="{% url 'resource_planner:capacity_edit' r.user.pk %}">Capacity</a>
+  </td>
+  {% endif %}
+</tr>

@@ -1,0 +1,53 @@
+{% extends "resource_planner/_base.html" %}
+
+{% block heading %}Department workload{% endblock %}
+{% block lede %}Team capacity for {{ window.start|date:"d M" }}&ndash;{{ window.end|date:"d M Y" }}.{% endblock %}
+
+{% block planner %}
+<div class="stat-grid">
+  <div class="stat"><div class="bar"></div><div class="n">{{ agency.capacity|floatformat:"0" }}</div><div class="l">Agency capacity (h)</div></div>
+  <div class="stat"><div class="bar"></div><div class="n">{{ agency.allocated|floatformat:"0" }}</div><div class="l">Allocated (h)</div></div>
+  <div class="stat"><div class="bar"></div><div class="n">{{ agency.utilization_percent|floatformat:"0" }}%</div><div class="l">Agency utilisation</div></div>
+  <div class="stat"><div class="bar"></div><div class="n">{{ agency.people }}</div><div class="l">People planned</div></div>
+</div>
+
+{% for row in rows %}
+<div class="card" style="margin-bottom:14px">
+  <div class="card-h">
+    <h3>{{ row.name }}</h3>
+    <span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <span class="tag gray">{{ row.headcount }} {{ row.headcount|pluralize:"person,people" }}</span>
+      {% if row.over_count %}<span class="tag danger">{{ row.over_count }} overloaded</span>{% endif %}
+      <span class="pill pill-{{ row.status }}">{{ row.utilization_percent|floatformat:"0" }}%</span>
+    </span>
+  </div>
+  <div class="card-b" style="padding-bottom:0">
+    <div class="dept-bar" role="img"
+         aria-label="{{ row.name }}: {{ row.allocated|floatformat:'-2' }} of {{ row.capacity|floatformat:'-2' }} hours allocated, {{ row.utilization_percent|floatformat:'0' }} percent">
+      <i class="u-{{ row.status }}" style="width:{% if row.utilization_percent > 100 %}100{% else %}{{ row.utilization_percent|floatformat:'0' }}{% endif %}%"></i>
+    </div>
+    <div class="dept-legend">
+      <span>{{ row.allocated|floatformat:"-2" }} h allocated</span>
+      <span>{{ row.capacity|floatformat:"-2" }} h capacity</span>
+      <span class="{% if row.remaining < 0 %}num-over{% endif %}">{{ row.remaining|floatformat:"-2" }} h remaining</span>
+      {% if row.leave_hours > 0 %}<span>{{ row.leave_hours|floatformat:"-2" }} h on leave</span>{% endif %}
+    </div>
+  </div>
+  <div class="table-wrap"><table>
+    <thead><tr>
+      <th>Person</th><th>Capacity</th><th>Allocated</th><th>Remaining</th>
+      <th>Utilisation</th><th>Sprint</th><th>Upcoming</th><th>Status</th>
+      {% if can_edit_capacity %}<th></th>{% endif %}
+    </tr></thead>
+    <tbody>
+      {% for r in row.members %}{% include "resource_planner/_person_row.html" with r=r %}{% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% empty %}
+<div class="card"><div class="empty">
+  <h3>Nothing to show</h3>
+  <p>No active employees match these filters.</p>
+</div></div>
+{% endfor %}
+{% endblock %}

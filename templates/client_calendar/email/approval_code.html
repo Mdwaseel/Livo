@@ -1,0 +1,26 @@
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f5f4;padding:32px 12px;font-family:Segoe UI,Helvetica,Arial,sans-serif">
+  <tr><td align="center">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border:1px solid #e0e3e2;border-radius:16px">
+      <tr><td style="padding:30px 32px 6px">
+        <div style="font-size:14px;font-weight:700;color:#141a17">{{ agency_name }}</div>
+        <h1 style="margin:16px 0 6px;font-size:21px;color:#141a17;font-weight:800">Your code to review</h1>
+        <p style="margin:0;color:#4c5450;font-size:14.5px;line-height:1.6">
+          Hi {{ reviewer.first_name }}, enter this code to confirm it's you and open the work waiting for your approval.
+        </p>
+      </td></tr>
+      <tr><td style="padding:22px 32px">
+        <div style="background:#f8f9f8;border:1px solid #e0e3e2;border-radius:12px;padding:18px;text-align:center">
+          <div style="font-family:Consolas,Menlo,monospace;font-size:34px;letter-spacing:.34em;color:#141a17;font-weight:700;padding-left:.34em">{{ code }}</div>
+        </div>
+        <p style="margin:14px 0 0;color:#6e7672;font-size:13px;line-height:1.6">
+          It expires in {{ minutes }} minutes and works once. This device will be remembered, so you won't need a code here again for a while.
+        </p>
+      </td></tr>
+      <tr><td style="padding:0 32px 28px">
+        <p style="margin:0;color:#8f9592;font-size:12.5px;line-height:1.6">
+          Didn't ask for this? You can ignore it — nobody can open your approvals without this code.
+        </p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>

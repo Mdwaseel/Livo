@@ -1,0 +1,52 @@
+{% load static client_calendar_tags %}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+{# The token is the only key to this page: keep it out of search engines and out of the Referer header. #}
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f5f7f6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1110" media="(prefers-color-scheme: dark)">
+<title>{{ client.name }} · Content calendar · {{ agency.agency_name|default:"Livo Digital" }}</title>
+<link rel="icon" type="image/png" href="{% static 'img/favicon.png' %}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700&family=JetBrains+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="{% static 'css/client_calendar.css' %}">
+</head>
+<body class="cc-body">
+<div class="cc cc-public" data-cc data-view="{{ filters.view }}">
+  {% include "client_calendar/_view_boot.html" %}
+  <a class="cc-skip" href="#cc-main">Skip to the calendar</a>
+
+  <header class="cc-topbar">
+    <div class="cc-brand">
+      <img src="{% static 'img/mark.png' %}" alt="" width="30" height="30">
+      <span>{{ agency.agency_name|default:"Livo Digital" }}</span>
+    </div>
+    <span class="cc-private-pill">{% cc_icon "lock" %}Private to {{ client.name }}</span>
+  </header>
+
+  <main class="cc-main" id="cc-main">
+    <section class="cc-hero">
+      <p class="cc-eyebrow">Content &amp; activity calendar</p>
+      <h1 class="cc-hero-title">{{ client.name }}</h1>
+      <p class="cc-hero-lede">Everything we've planned and delivered for you — posts, stories, ad campaigns and reports. Tap any highlighted day to see what's happening.</p>
+      {% if last_updated %}
+      <p class="cc-updated"><span class="cc-live-dot" aria-hidden="true"></span>Kept up to date by our team · last change {{ last_updated|cc_ago }}</p>
+      {% endif %}
+    </section>
+
+    {% include "client_calendar/_calendar.html" %}
+  </main>
+
+  <footer class="cc-footer">
+    <p>Prepared for {{ client.name }} by <strong>{{ agency.agency_name|default:"Livo Digital" }}</strong>{% if agency.email or agency.phone %} · Questions?{% if agency.email %} <a href="mailto:{{ agency.email }}">{{ agency.email }}</a>{% endif %}{% if agency.phone %}{% if agency.email %} ·{% endif %} <a href="tel:{{ agency.phone|cut:' ' }}">{{ agency.phone }}</a>{% endif %}{% endif %}</p>
+    <p class="cc-footer-note">{% cc_icon "lock" %}This link is private — please don't forward it.</p>
+  </footer>
+</div>
+<script src="{% static 'js/client_calendar.js' %}" defer></script>
+</body>
+</html>

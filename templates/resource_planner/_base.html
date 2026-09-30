@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% comment %}
+Shared shell for the planner: sub-navigation, the period stepper and the scope
+filters. Every screen shares one URL grammar — ?date= anchors the period,
+?department=/?employee=/?project= narrow it — so a filter survives switching
+between the weekly grid and the department rollup.
+{% endcomment %}
+
+{% block crumb %}Resource planning{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>{% block heading %}Resource planning{% endblock %}</h2>
+    <p>{% block lede %}Who is free, who is full, and who is over.{% endblock %}</p>
+  </div>
+  {% block head_actions %}{% endblock %}
+</div>
+
+<nav class="subnav" aria-label="Planner sections">
+  <a href="{% url 'resource_planner:overview' %}" {% if active == 'overview' %}class="on" aria-current="page"{% endif %}>Overview</a>
+  <a href="{% url 'resource_planner:employees' %}" {% if active == 'employees' %}class="on" aria-current="page"{% endif %}>Employees</a>
+  <a href="{% url 'resource_planner:departments' %}" {% if active == 'departments' %}class="on" aria-current="page"{% endif %}>Departments</a>
+  <a href="{% url 'resource_planner:projects' %}" {% if active == 'projects' %}class="on" aria-current="page"{% endif %}>Projects</a>
+  <a href="{% url 'resource_planner:weekly' %}" {% if active == 'weekly' %}class="on" aria-current="page"{% endif %}>Weekly planner</a>
+  <a href="{% url 'resource_planner:monthly' %}" {% if active == 'monthly' %}class="on" aria-current="page"{% endif %}>Monthly planner</a>
+  <a href="{% url 'resource_planner:leave' %}" {% if active == 'leave' %}class="on" aria-current="page"{% endif %}>Leave</a>
+</nav>
+
+{% if window %}
+<form method="get" class="card filter-card" aria-label="Planner scope">
+  <div class="filter-bar">
+    <div class="period-step">
+      <a class="btn sm ghost" href="?date={{ window.previous|date:'Y-m-d' }}{% if window.department_id %}&department={{ window.department_id }}{% endif %}{% if window.user_id %}&employee={{ window.user_id }}{% endif %}{% if window.project_id %}&project={{ window.project_id }}{% endif %}"
+         aria-label="Previous period">&larr;</a>
+      <strong class="period-label">
+        {% if window.mode == 'month' %}{{ window.start|date:"F Y" }}
+        {% else %}{{ window.start|date:"d M" }} &ndash; {{ window.end|date:"d M Y" }}{% endif %}
+      </strong>
+      <a class="btn sm ghost" href="?date={{ window.next|date:'Y-m-d' }}{% if window.department_id %}&department={{ window.department_id }}{% endif %}{% if window.user_id %}&employee={{ window.user_id }}{% endif %}{% if window.project_id %}&project={{ window.project_id }}{% endif %}"
+         aria-label="Next period">&rarr;</a>
+      <a class="btn sm ghost" href="{{ request.path }}">Today</a>
+    </div>
+    <label class="fb-field"><span>Department</span>
+      <select name="department">
+        <option value="">All</option>
+        {% for d in departments %}<option value="{{ d.pk }}" {% if window.department_id == d.pk %}selected{% endif %}>{{ d.name }}</option>{% endfor %}
+      </select></label>
+    <label class="fb-field"><span>Employee</span>
+      <select name="employee">
+        <option value="">All</option>
+        {% for p in people %}<option value="{{ p.user_id }}" {% if window.user_id == p.user_id %}selected{% endif %}>{{ p.display_name }}</option>{% endfor %}
+      </select></label>
+    <label class="fb-field"><span>Project</span>
+      <select name="project">
+        <option value="">All</option>
+        {% for p in projects %}<option value="{{ p.pk }}" {% if window.project_id == p.pk %}selected{% endif %}>{{ p.client.name }} — {{ p.name }}</option>{% endfor %}
+      </select></label>
+    <input type="hidden" name="date" value="{{ window.start|date:'Y-m-d' }}">
+    <button class="btn sm" type="submit">Apply</button>
+  </div>
+</form>
+{% endif %}
+
+{% block planner %}{% endblock %}
+{% endblock %}

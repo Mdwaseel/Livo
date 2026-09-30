@@ -1,0 +1,47 @@
+{% comment %}
+"Coming up" and "Overdue", side by side under the grid.
+
+Both are computed from the events already collected for the grid rather than
+re-queried, so they can never disagree with what's drawn above them — the same
+rule resource_planner.services.summarise follows.
+{% endcomment %}
+<div class="cal-strips">
+  <div class="card">
+    <div class="card-h"><h3>Coming up</h3></div>
+    <div class="card-b">
+      {% if next_up %}
+        <ul class="tight-list">
+          {% for event in next_up %}
+          <li>
+            <span class="marker tone-{{ event.kind_info.tone }}" aria-hidden="true">{{ event.kind_info.marker }}</span>
+            <a href="{{ event.url }}">{{ event.title }}</a>
+            <span class="num">{{ event.start_date|date:"D d M" }}{% if not event.is_all_day %} {{ event.start_time|time:"H:i" }}{% endif %}</span>
+          </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted">Nothing scheduled in this period.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><h3>Overdue</h3>
+      {% if overdue %}<span class="tag danger">{{ overdue|length }}</span>{% endif %}</div>
+    <div class="card-b">
+      {% if overdue %}
+        <ul class="tight-list">
+          {% for event in overdue %}
+          <li>
+            <span class="marker tone-{{ event.kind_info.tone }}" aria-hidden="true">{{ event.kind_info.marker }}</span>
+            <a href="{{ event.url }}">{{ event.title }}</a>
+            <span class="num">was due {{ event.start_date|date:"d M" }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted">Nothing in this period is late.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>

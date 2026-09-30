@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+{% load rbac_tags %}
+{% block crumb %}Documents{% endblock %}
+{% block content %}
+{% user_can user 'documents' 'create' as can_add_doc %}
+{% user_can user 'documents' 'delete' as can_del_doc %}
+<div class="page-head">
+  <div><h2>Documents</h2>
+    <p>Grouped by project — {{ doc_total }} document{{ doc_total|pluralize }}{% if show_archived %} (archived){% endif %}.</p></div>
+  {% if can_add_doc %}
+  {% comment %}
+  Two selects and a button, but the button used to be live from the moment the
+  panel opened and answered a half-filled form with an alert() — a dialog that
+  says what you should have done, after the fact. It is disabled until both
+  choices exist, and the line above it names what is about to be created, so
+  the panel answers "what happens when I click this" before it is clicked.
+  {% endcomment %}
+  <details class="menu" id="new-doc">
+    <summary class="btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      New document
+    </summary>
+    <div class="pop nd-pop">
+      <div class="nd-h">New document</div>
+      <div class="nd-f">
+        <label class="inl-l" for="nd-project">Project</label>
+        <select id="nd-project">
+          <option value="">Choose a project…</option>
+          {% for p in projects %}<option value="{{ p.pk }}" data-label="{{ p.name }}">{{ p.client.name }} · {{ p.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="nd-f">
+        <label class="inl-l" for="nd-type">Document type</label>
+        <select id="nd-type">
+          <option value="">Choose a type…</option>
+          {% regroup doc_types by get_category_display as stages %}
+          {% for stage in stages %}<optgroup label="{{ stage.grouper }}">
+            {% for t in stage.list %}<option value="{{ t.slug }}" data-label="{{ t.name }}">{{ t.name }}</option>{% endfor %}
+          </optgroup>{% endfor %}
+        </select>
+      </div>
+      <p class="nd-note" id="nd-note">Pick a project and a type — the document
+        opens ready to edit, numbered and dated for you.</p>
+      <button type="button" class="btn nd-go" id="nd-go"
+              data-base="{% url 'documents:list' %}" disabled>Create document</button>
+    </div>
+  </details>
+  {% endif %}
+</div>
+
+<form method="get" class="filters" style="margin-bottom:14px">
+  <div class="search">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input name="q" value="{{ q }}" placeholder="Search title, number, client…">
+  </div>
+  <select name="type" onchange="this.form.submit()">
+    <option value="">All types</option>
+    {% for t in doc_types %}
+      <option value="{{ t.slug }}" {% if type_slug == t.slug %}selected{% endif %}>{{ t.name }}</option>
+    {% endfor %}
+  </select>
+  <select name="status" onchange="this.form.submit()">
+    <option value="">All statuses</option>
+    {% for value, label in statuses %}
+      <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  {% if show_archived %}<input type="hidden" name="archived" value="1">{% endif %}
+  {% if q or status or type_slug %}<a class="btn ghost sm" href="{% url 'documents:list' %}{% if show_archived %}?archived=1{% endif %}">Clear</a>{% endif %}
+  {% if show_archived %}
+  <a href="{% url 'documents:list' %}" style="font-size:12px;font-weight:600;color:var(--primary);align-self:center">← Back to active</a>
+  {% else %}
+  <a href="{% url 'documents:list' %}?archived=1" style="font-size:12px;font-weight:600;color:var(--ink-soft);align-self:center">View archived</a>
+  {% endif %}
+</form>
+
+{% if show_archived %}
+<div class="banner" style="margin-bottom:14px;border-radius:8px"><span>Showing archived documents.</span></div>
+{% endif %}
+
+{% if can.approve %}
+<form id="bulk-docs" data-bulk method="post" action="{% url 'documents:bulk_action' %}">
+  {% csrf_token %}
+</form>
+<div class="bulk-bar" data-bulk-bar="bulk-docs" hidden>
+  <span class="count">0 selected</span>
+  {% if show_archived %}
+  <button class="btn sm warn" type="submit" form="bulk-docs" name="action" value="restore">Restore selected</button>
+  {% else %}
+  <button class="btn sm ghost" type="submit" form="bulk-docs" name="action" value="archive">Archive selected</button>
+  {% endif %}
+  {% if can_del_doc %}
+  <button class="btn sm danger" type="submit" form="bulk-docs" name="action" value="delete"
+          onclick="return confirm('Permanently delete the selected documents? This cannot be undone.')">Delete selected</button>
+  {% endif %}
+</div>
+{% endif %}
+
+{% for g in groups %}
+<div class="acc{% if forloop.counter <= 3 or q or status or type_slug %} open{% endif %}">
+  <button type="button" class="acc-h" aria-expanded="{% if forloop.counter <= 3 or q or status or type_slug %}true{% else %}false{% endif %}" aria-controls="acc-doc-{{ g.project.pk }}">
+    <svg class="acc-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+    <span class="acc-name">{{ g.project.name }}</span>
+    <span class="acc-meta">
+      <span class="tag gray">{{ g.project.client.name }}</span>
+      <span class="tag gray">{{ g.documents|length }} doc{{ g.documents|length|pluralize }}</span>
+    </span>
+  </button>
+  <div class="acc-b" id="acc-doc-{{ g.project.pk }}">
+    <div class="acc-inner">
+      <div class="table-wrap">
+      <table>
+        <thead><tr>
+          {% if can.approve %}<th class="chk"></th>{% endif %}
+          <th>Document</th><th>Type</th><th>Version</th><th>Status</th><th>Updated</th>
+          {% if can.documents %}<th></th>{% endif %}
+        </tr></thead>
+        <tbody>
+        {% for d in g.documents %}
+          <tr>
+          {% if can.approve %}
+          <td class="chk"><input type="checkbox" name="selected" value="{{ d.pk }}" form="bulk-docs" aria-label="Select {{ d.title }}"></td>
+          {% endif %}
+          <td><a href="{{ d.get_absolute_url }}"><strong>{{ d.title }}</strong></a>
+            {% if d.number %} <span class="num">{{ d.number }}</span>{% endif %}</td>
+          <td style="color:var(--ink-soft)">{{ d.document_type.name }}</td>
+          <td style="color:var(--ink-soft)">{% if d.current_version %}v{{ d.current_version.version_number }}{% else %}—{% endif %}</td>
+          <td><span class="tag {% if d.status == 'APPROVED' or d.status == 'SENT' %}ok{% elif d.status == 'REVIEW' %}warn{% else %}gray{% endif %}">{{ d.get_status_display }}</span></td>
+          <td style="color:var(--ink-soft)">{{ d.updated_at|date:"d M Y" }}</td>
+          {% if can.documents %}
+          <td class="row-actions">
+            <a href="{{ d.get_absolute_url }}">Edit</a>
+            {% if can_del_doc %}
+            <form method="post" action="{% url 'documents:delete' d.pk %}" style="display:inline"
+                  onsubmit="return confirm('Permanently delete “{{ d.title|escapejs }}”? This cannot be undone.')">
+              {% csrf_token %}<button type="submit" class="link-danger">Delete</button>
+            </form>
+            {% endif %}
+          </td>
+          {% endif %}
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      <div class="acc-foot">
+        <a href="{{ g.project.get_absolute_url }}">Open project →</a>
+        {% if can_add_doc %}
+        <details class="menu">
+          <summary class="link-act">+ New document for {{ g.project.name }}</summary>
+          <div class="pop">
+            {% regroup doc_types by get_category_display as stages %}
+            {% for stage in stages %}
+              <div class="divider">{{ stage.grouper }}</div>
+              {% for t in stage.list %}
+                <a href="{% url 'documents:create' g.project.pk t.slug %}">{{ t.name }}</a>
+              {% endfor %}
+            {% endfor %}
+          </div>
+        </details>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% empty %}
+<div class="card"><div class="empty"><h3>No documents found</h3>
+  <p>{% if q or status or type_slug %}Try clearing the search or filters.{% elif can_add_doc %}Use “New document” above to create your first one.{% else %}Documents are generated from a project page.{% endif %}</p></div></div>
+{% endfor %}
+
+<script>
+document.querySelectorAll(".acc-h").forEach(function (btn) {
+  btn.addEventListener("click", function () {
+    var acc = btn.closest(".acc");
+    var open = acc.classList.toggle("open");
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+});
+(function () {
+  var go = document.getElementById("nd-go");
+  var project = document.getElementById("nd-project");
+  var type = document.getElementById("nd-type");
+  var note = document.getElementById("nd-note");
+  if (!go || !project || !type) return;
+
+  function labelOf(select) {
+    var option = select.options[select.selectedIndex];
+    return option ? (option.dataset.label || option.text) : "";
+  }
+
+  function sync() {
+    var ready = project.value && type.value;
+    go.disabled = !ready;
+    if (ready) {
+      note.textContent = "Creates a " + labelOf(type) + " for " + labelOf(project) + ".";
+      note.classList.add("is-ready");
+    } else {
+      note.textContent = project.value
+        ? "Now pick the type of document to create."
+        : "Pick a project and a type — the document opens ready to edit, "
+          + "numbered and dated for you.";
+      note.classList.remove("is-ready");
+    }
+  }
+
+  function create() {
+    if (go.disabled) return;
+    // Told before the navigation, not after: creating a document is a server
+    // round trip, and a button that stays bright and idle reads as a click
+    // that did not register, so people click it again.
+    go.disabled = true;
+    go.textContent = "Creating…";
+    window.location.href = go.dataset.base + "new/" + encodeURIComponent(project.value)
+      + "/" + encodeURIComponent(type.value) + "/";
+  }
+
+  project.addEventListener("change", sync);
+  type.addEventListener("change", sync);
+  go.addEventListener("click", create);
+  // Enter anywhere in the panel does what the button does — the panel is a form
+  // in everything but markup, and it is faster to fill without reaching for it.
+  [project, type].forEach(function (select) {
+    select.addEventListener("keydown", function (event) {
+      if (event.key === "Enter") { event.preventDefault(); create(); }
+    });
+  });
+  sync();
+})();
+</script>
+{% include "_bulk_select.html" %}
+{% endblock %}

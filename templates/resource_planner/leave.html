@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block crumb %}Resource planning · Leave{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Leave &amp; holidays</h2>
+    <p>Approved leave is deducted from capacity everywhere in the planner.</p>
+  </div>
+</div>
+
+<nav class="subnav" aria-label="Planner sections">
+  <a href="{% url 'resource_planner:overview' %}">Overview</a>
+  <a href="{% url 'resource_planner:employees' %}">Employees</a>
+  <a href="{% url 'resource_planner:departments' %}">Departments</a>
+  <a href="{% url 'resource_planner:projects' %}">Projects</a>
+  <a href="{% url 'resource_planner:weekly' %}">Weekly planner</a>
+  <a href="{% url 'resource_planner:monthly' %}">Monthly planner</a>
+  <a href="{% url 'resource_planner:leave' %}" class="on" aria-current="page">Leave</a>
+</nav>
+
+{% if can_manage_leave %}
+<form method="post" action="{% url 'resource_planner:leave_create' %}" class="card" style="margin-bottom:18px">
+  {% csrf_token %}
+  <div class="card-h"><h3>Record leave</h3></div>
+  <div class="card-b">
+    <div class="filter-bar" style="padding:0;border:none;background:none">
+      <label class="fb-field"><span>Person</span>
+        <select name="user">
+          <option value="">Everyone (company holiday)</option>
+          {% for p in people %}<option value="{{ p.user_id }}">{{ p.display_name }}</option>{% endfor %}
+        </select></label>
+      <label class="fb-field"><span>Type</span>
+        <select name="kind">
+          {% for value, label in kinds %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+        </select></label>
+      <label class="fb-field"><span>From</span>
+        <input type="date" name="start_date" required></label>
+      <label class="fb-field"><span>To</span>
+        <input type="date" name="end_date" required></label>
+      <label class="fb-field"><span>Half day</span>
+        <input type="checkbox" name="is_half_day" value="1" style="width:16px;height:16px"></label>
+      {# Same field the self-service form calls "Reason" — one column, one name. #}
+      <label class="fb-field" style="flex:1"><span>Reason</span>
+        <input name="note" maxlength="200" placeholder="Optional here"></label>
+      <button class="btn sm" type="submit">Add</button>
+    </div>
+    <p class="hint" style="margin:10px 0 0">
+      {% if can_approve_leave %}Entries you add are approved immediately and take
+      effect on capacity right away.{% else %}Entries you add are recorded as
+      requests. They appear on the planner as a warning but don't change
+      anybody's capacity until somebody approves them.{% endif %}
+      Leaving the person blank marks a day off for the whole agency.</p>
+  </div>
+</form>
+{% endif %}
+
+<div class="card">
+  <div class="card-h"><h3>Upcoming &amp; recent</h3><span class="tag gray">{{ records|length }}</span></div>
+  {% if records %}
+  <div class="table-wrap"><table>
+    <thead><tr>
+      <th>Person</th><th>Type</th><th>Dates</th><th>Days</th><th>Status</th>
+      {% if can_manage_leave or can_approve_leave %}<th></th>{% endif %}
+    </tr></thead>
+    <tbody>
+      {% for l in records %}
+      <tr>
+        <td>{% if l.is_company_wide %}<strong>Everyone</strong>
+            <div class="cell-sub">Company-wide</div>
+          {% else %}<strong>{{ l.user.get_full_name|default:l.user.username }}</strong>{% endif %}</td>
+        <td>{{ l.get_kind_display }}{% if l.is_half_day %} <span class="tag gray">½ day</span>{% endif %}</td>
+        <td>{{ l.start_date|date:"d M Y" }}{% if l.end_date != l.start_date %} &ndash; {{ l.end_date|date:"d M Y" }}{% endif %}
+          {% if l.is_current %}<div class="cell-sub num-over">Away now</div>{% endif %}</td>
+        <td>{{ l.days }}</td>
+        <td><span class="tag {% if l.status == 'APPROVED' %}ok{% elif l.status == 'REQUESTED' %}warn{% else %}gray{% endif %}">{{ l.get_status_display }}</span>
+          {% if l.status == 'REQUESTED' %}<div class="cell-sub">Not deducted yet</div>{% endif %}</td>
+        {% if can_manage_leave or can_approve_leave %}
+        <td style="text-align:right;white-space:nowrap">
+          {% if can_approve_leave and l.status == 'REQUESTED' %}
+          <form method="post" action="{% url 'resource_planner:leave_update' l.pk %}" style="display:inline">
+            {% csrf_token %}<input type="hidden" name="action" value="approve">
+            <button class="link-act" type="submit">Approve</button></form>
+          <form method="post" action="{% url 'resource_planner:leave_update' l.pk %}" style="display:inline">
+            {% csrf_token %}<input type="hidden" name="action" value="reject">
+            <button class="link-act muted" type="submit">Reject</button></form>
+          {% endif %}
+          {% if can_manage_leave %}
+          <form method="post" action="{% url 'resource_planner:leave_update' l.pk %}" style="display:inline"
+                onsubmit="return confirm('Remove this leave record? Capacity will go back up.')">
+            {% csrf_token %}<input type="hidden" name="action" value="delete">
+            <button class="link-danger" type="submit">Delete</button></form>
+          {% endif %}
+        </td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}
+  <div class="empty">
+    <h3>No leave recorded</h3>
+    <p>Capacity is currently full working days for everybody. Add vacations and
+       public holidays here and the planner will account for them.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

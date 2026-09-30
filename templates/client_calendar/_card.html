@@ -1,0 +1,39 @@
+{% load client_calendar_tags %}
+{% comment %}
+One activity, full detail. Used in the list view, and cloned into the day sheet
+when a date is opened — one piece of markup, so the two can never disagree.
+
+Status is carried three ways — icon, words, colour — so it survives colour
+blindness, a phone in sunlight and a black-and-white printout.
+{% endcomment %}
+<article class="cc-card fam-{{ a.family }} st-{{ a.status|lower }}{% if not a.show_to_client %} is-hidden{% endif %}">
+  {% if a.preview %}
+  <div class="cc-thumb">
+    <img src="{% if mode == 'public' %}{% url 'client_calendar_public:preview' link.token a.pk %}{% else %}{{ a.preview.url }}{% endif %}"
+         alt="Preview of {{ a.title }}" loading="lazy" decoding="async" width="88" height="88">
+  </div>
+  {% endif %}
+  <div class="cc-card-b">
+    <div class="cc-meta">
+      <span class="cc-kind">{% cc_icon a.kind_icon %}{{ a.short_kind }}</span>
+      {% if a.platform %}<span class="cc-plat">{% cc_icon a.platform_icon %}{{ a.get_platform_display }}</span>{% endif %}
+      {% if a.time %}<span class="cc-time">{% cc_icon "clock" %}{{ a.time|time:"g:i A" }}</span>{% endif %}
+    </div>
+    <h3 class="cc-card-title">{{ a.title }}</h3>
+    {% if a.details %}<p class="cc-card-text">{{ a.details|linebreaksbr }}</p>{% endif %}
+    <div class="cc-card-foot">
+      <span class="cc-status st-{{ a.status|lower }}">{% cc_icon a.status_icon %}{% if mode == 'public' %}{{ a.client_status_label }}{% else %}{{ a.get_status_display }}{% endif %}</span>
+      {% if projects|length > 1 %}<span class="cc-proj">{{ a.project.name }}</span>{% endif %}
+      {% if mode == 'planner' and not a.show_to_client %}<span class="cc-private">{% cc_icon "eye_off" %}Hidden from client</span>{% endif %}
+      {% if mode == 'planner' %}{% with ap=a.latest_approval %}{% if ap %}
+      <a class="cc-approval-chip is-{{ ap.status|lower }}" href="{{ ap.get_absolute_url }}">
+        {% if ap.is_pending %}{% cc_icon "clock" %}Waiting on client{% elif ap.status == 'APPROVED' %}{% cc_icon "badge_check" %}Approved{% if ap.decided_by %} by {{ ap.decided_by.first_name }}{% endif %}{% elif ap.status == 'CHANGES' %}{% cc_icon "message" %}Changes requested{% else %}{% cc_icon "undo" %}Approval withdrawn{% endif %}{% if ap.version > 1 %} · v{{ ap.version }}{% endif %}</a>
+      {% endif %}{% endwith %}{% endif %}
+      <span class="cc-card-actions">
+        {% if a.link %}<a class="cc-link" href="{{ a.link }}" target="_blank" rel="noopener noreferrer">{% if a.is_done %}View{% else %}Open{% endif %}{% cc_icon "external" %}<span class="cc-sr"> (opens in a new tab)</span></a>{% endif %}
+        {% if mode == 'planner' and can_plan and not a.latest_approval and not a.is_done %}<a class="cc-link" href="{% url 'client_calendar:approval_create' a.pk %}">{% cc_icon "send" %}Ask for approval</a>{% endif %}
+        {% if mode == 'planner' and can_plan %}<a class="cc-link" href="{% url 'client_calendar:activity_edit' a.pk %}">Edit</a>{% endif %}
+      </span>
+    </div>
+  </div>
+</article>

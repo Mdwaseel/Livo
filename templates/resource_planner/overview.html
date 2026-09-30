@@ -1,0 +1,106 @@
+{% extends "resource_planner/_base.html" %}
+
+{% block heading %}Resource planning{% endblock %}
+{% block lede %}Who is free, who is full, and who is over — for {{ window.start|date:"d M" }}&ndash;{{ window.end|date:"d M" }}.{% endblock %}
+
+{% block planner %}
+<div class="stat-grid">
+  <div class="stat"><div class="bar"></div><div class="n">{{ summary.capacity|floatformat:"0" }}</div><div class="l">Capacity (h)</div></div>
+  <div class="stat"><div class="bar"></div><div class="n">{{ summary.allocated|floatformat:"0" }}</div><div class="l">Allocated (h)</div></div>
+  <div class="stat{% if summary.remaining < 0 %} tone-danger{% endif %}"><div class="bar"></div>
+    <div class="n">{{ summary.remaining|floatformat:"0" }}</div><div class="l">Remaining (h)</div></div>
+  <div class="stat"><div class="bar"></div><div class="n">{{ summary.utilization_percent|floatformat:"0" }}%</div><div class="l">Agency utilisation</div></div>
+  <div class="stat tone-ok"><div class="bar"></div><div class="n">{{ summary.available_count }}</div><div class="l">Available</div></div>
+  <div class="stat tone-warn"><div class="bar"></div><div class="n">{{ summary.near_count }}</div><div class="l">Near capacity</div></div>
+  <div class="stat tone-danger"><div class="bar"></div><div class="n">{{ summary.over_count }}</div><div class="l">Overloaded</div></div>
+  <div class="stat"><div class="bar"></div><div class="n">{{ summary.leave_hours|floatformat:"0" }}</div><div class="l">Hours on leave</div></div>
+</div>
+
+{% if overbooking.count %}
+<div class="card alert-card">
+  <div class="card-h"><h3>Overbooking detected</h3>
+    <span class="tag danger">{{ overbooking.total_overrun|floatformat:"-2" }} h over</span></div>
+  <div class="card-b">
+    <p class="hint" style="margin:0 0 12px">
+      {{ overbooking.count }} {{ overbooking.count|pluralize:"person is,people are" }} carrying more
+      committed work than this period has hours for. Move something, extend a date, or accept it knowingly.</p>
+    <ul class="over-list">
+      {% for r in overbooking.rows %}
+      <li>
+        <strong>{{ r.user.get_full_name|default:r.user.username }}</strong>
+        <span class="pill pill-over">{{ r.utilization_percent|floatformat:"0" }}%</span>
+        <span class="cell-sub">{{ r.allocated_hours|floatformat:"-2" }} h against {{ r.capacity|floatformat:"-2" }} h &mdash;
+          {{ r.remaining_capacity|floatformat:"-2" }} h</span>
+        <a class="link-act" href="{% url 'resource_planner:weekly' %}?employee={{ r.user.pk }}&date={{ window.start|date:'Y-m-d' }}">Open week</a>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endif %}
+
+<div class="board-grid">
+  {% include "resource_planner/_board_column.html" with title="Can take more" tone="ok" rows=board.free empty="Nobody has spare capacity this period." %}
+  {% include "resource_planner/_board_column.html" with title="Near capacity" tone="warn" rows=board.near empty="Nobody is close to full." %}
+  {% include "resource_planner/_board_column.html" with title="Overloaded" tone="danger" rows=board.over empty="Nobody is over. Good week." %}
+  {% include "resource_planner/_board_column.html" with title="Unclear" tone="gray" rows=board.unclear empty="Every open task has an estimate." note="Looks free, but has open tasks with no estimate — the spare capacity may not be real." %}
+</div>
+
+<div class="grid-2" style="margin-top:18px">
+  <div class="card">
+    <div class="card-h"><h3>Most utilised</h3></div>
+    {% if leaders.top %}
+    <table><tbody>
+      {% for r in leaders.top %}
+      <tr>
+        <td><strong>{{ r.user.get_full_name|default:r.user.username }}</strong>
+          <div class="cell-sub">{{ r.department.name|default:"—" }}</div></td>
+        <td style="width:120px">
+          <span class="meter" aria-hidden="true"><i class="u-{{ r.status }}" style="width:{% if r.utilization_percent > 100 %}100{% else %}{{ r.utilization_percent|floatformat:'0' }}{% endif %}%"></i></span>
+          {{ r.utilization_percent|floatformat:"0" }}%</td>
+      </tr>
+      {% endfor %}
+    </tbody></table>
+    {% else %}<div class="empty" style="padding:24px"><p>No capacity in this period.</p></div>{% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-h"><h3>Least utilised</h3></div>
+    {% if leaders.bottom %}
+    <table><tbody>
+      {% for r in leaders.bottom %}
+      <tr>
+        <td><strong>{{ r.user.get_full_name|default:r.user.username }}</strong>
+          <div class="cell-sub">{{ r.remaining_capacity|floatformat:"-2" }} h free</div></td>
+        <td style="width:120px">
+          <span class="meter" aria-hidden="true"><i class="u-{{ r.status }}" style="width:{{ r.utilization_percent|floatformat:'0' }}%"></i></span>
+          {{ r.utilization_percent|floatformat:"0" }}%</td>
+      </tr>
+      {% endfor %}
+    </tbody></table>
+    {% else %}<div class="empty" style="padding:24px"><p>No capacity in this period.</p></div>{% endif %}
+  </div>
+</div>
+
+<div class="card" style="margin-top:18px">
+  <div class="card-h"><h3>Capacity forecast</h3><span class="tag gray">next 8 weeks</span></div>
+  <div class="card-b">
+    <div class="forecast">
+      {% for week in forecast %}
+      <div class="forecast-week{% if week.is_current %} now{% endif %}">
+        <div class="fw-label">{{ week.start|date:"d M" }}</div>
+        <div class="fw-bar" role="img"
+             aria-label="{{ week.start|date:'d M' }}: {{ week.utilization_percent|floatformat:'0' }} percent utilised, {{ week.remaining|floatformat:'-2' }} hours free">
+          <i class="u-{{ week.status }}" style="height:{% if week.utilization_percent > 100 %}100{% else %}{{ week.utilization_percent|floatformat:'0' }}{% endif %}%"></i>
+        </div>
+        <div class="fw-value">{{ week.utilization_percent|floatformat:"0" }}%</div>
+        <div class="fw-sub">{{ week.remaining|floatformat:"0" }} h free</div>
+      </div>
+      {% endfor %}
+    </div>
+    <p class="hint" style="margin:14px 0 0">
+      Committed work against available hours, week by week. Capacity already has
+      approved leave deducted, so a dip is either time off or a hiring gap.</p>
+  </div>
+</div>
+{% endblock %}

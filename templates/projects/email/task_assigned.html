@@ -1,0 +1,70 @@
+{% comment %}
+Table layout and inline styles, matching accounts/email/login_code.html: mail
+clients strip <style> blocks and have no flexbox, so anything smarter than this
+renders as a broken stack in Outlook.
+{% endcomment %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#131715;padding:32px 12px;font-family:Segoe UI,Helvetica,Arial,sans-serif">
+  <tr><td align="center">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#1b201e;border:1px solid #2e3833;border-radius:14px">
+      <tr><td style="padding:30px 32px 8px">
+        <div style="font-size:13px;letter-spacing:.18em;text-transform:uppercase;color:#17e381;font-weight:700">Livo OS</div>
+        <h1 style="margin:14px 0 6px;font-size:20px;color:#ffffff;font-weight:700">A task is yours</h1>
+        <p style="margin:0;color:#a6aca9;font-size:14px;line-height:1.6">
+          Hi {{ assignee.get_full_name|default:assignee.username }},
+          {% if actor %}{{ actor.get_full_name|default:actor.username }} assigned you the task below.{% else %}the task below has been assigned to you.{% endif %}
+        </p>
+      </td></tr>
+
+      <tr><td style="padding:22px 32px 6px">
+        <div style="background:#131715;border:1px solid #36403b;border-radius:10px;padding:18px 20px">
+          <div style="font-size:17px;color:#ffffff;font-weight:700;line-height:1.4">{{ task.title }}</div>
+          {% if task.description %}
+          <p style="margin:9px 0 0;color:#a6aca9;font-size:13px;line-height:1.6">{{ task.description|truncatechars:320 }}</p>
+          {% endif %}
+        </div>
+      </td></tr>
+
+      <tr><td style="padding:14px 32px 6px">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:12.5px;color:#848a87">
+          <tr>
+            <td style="padding:4px 0">Project</td>
+            <td align="right" style="color:#cbcfcd">{{ project.name }}{% if client %} &middot; {{ client.name }}{% endif %}</td>
+          </tr>
+          <tr>
+            <td style="padding:4px 0">Priority</td>
+            <td align="right" style="color:#cbcfcd">{{ task.get_priority_display }}</td>
+          </tr>
+          {% if task.due_date %}
+          <tr>
+            <td style="padding:4px 0">Due</td>
+            <td align="right" style="color:#cbcfcd">{{ task.due_date|date:"D, d M Y" }}</td>
+          </tr>
+          {% endif %}
+          {% if task.estimated_hours %}
+          <tr>
+            <td style="padding:4px 0">Estimate</td>
+            <td align="right" style="color:#cbcfcd">{{ task.estimated_hours|floatformat:"-2" }} h</td>
+          </tr>
+          {% endif %}
+          {% if task.reviewer %}
+          <tr>
+            <td style="padding:4px 0">Reviewer</td>
+            <td align="right" style="color:#cbcfcd">{{ task.reviewer.get_full_name|default:task.reviewer.username }}</td>
+          </tr>
+          {% endif %}
+        </table>
+      </td></tr>
+
+      {% if url %}
+      <tr><td style="padding:20px 32px 30px">
+        <a href="{{ url }}" style="display:inline-block;background:#17e381;color:#131715;font-size:13.5px;font-weight:700;text-decoration:none;padding:11px 22px;border-radius:9px">Open the task</a>
+      </td></tr>
+      {% else %}
+      <tr><td style="padding:6px 32px 30px"></td></tr>
+      {% endif %}
+    </table>
+    <div style="max-width:520px;margin-top:14px;color:#626764;font-size:11.5px">
+      Sent automatically by Livo OS. Please don't reply to this address.
+    </div>
+  </td></tr>
+</table>

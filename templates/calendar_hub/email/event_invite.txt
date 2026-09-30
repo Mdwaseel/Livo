@@ -1,0 +1,25 @@
+Hi {{ person.get_full_name|default:person.username }},
+
+{% if change == "cancelled" %}{% if actor %}{{ actor.get_full_name|default:actor.username }} cancelled{% else %}This has been cancelled{% endif %} the {{ event.get_kind_display|lower }} below. Nothing is expected of you — it's off.{% elif change == "updated" %}{% if actor %}{{ actor.get_full_name|default:actor.username }} changed{% else %}There's a change to{% endif %} a {{ event.get_kind_display|lower }} you're on. The details below are the current ones.{% else %}{% if actor %}{{ actor.get_full_name|default:actor.username }} invited you to{% else %}You've been invited to{% endif %} a {{ event.get_kind_display|lower }}.{% endif %}
+
+    {{ event.title }}
+
+When:      {{ when }}
+{% if event.is_recurring %}Repeats:   {{ event.recurrence_label }}
+{% endif %}{% if event.location %}Where:     {{ event.location }}
+{% endif %}{% if event.meeting_url %}Join:      {{ event.meeting_url }}
+{% endif %}{% if project %}Project:   {{ project.name }}{% if client %} · {{ client.name }}{% endif %}
+{% elif client %}Client:    {{ client.name }}
+{% endif %}{% if department %}Team:      {{ department.name }}
+{% endif %}{% if organiser %}Organiser: {{ organiser.get_full_name|default:organiser.username }}
+{% endif %}{% if attendees %}Attendees: {% for guest in attendees %}{{ guest.get_full_name|default:guest.username }}{% if not forloop.last %}, {% endif %}{% endfor %}
+{% endif %}{% if event.reminder_minutes is not None %}Reminder:  {{ event.reminder_minutes }} minutes before
+{% endif %}{% if event.description %}
+{{ event.description }}
+{% endif %}{% if url %}
+Full details:
+{{ url }}
+{% endif %}
+{% if change == "cancelled" %}The attached file removes it from your calendar.{% else %}The attached file adds it to your calendar.{% endif %}
+
+-- Livo OS

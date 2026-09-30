@@ -1,0 +1,148 @@
+#!/bin/bash
+# /usr/local/bin/agencyos-deploy
+#
+# Pull main, migrate, collect static, restart gunicorn — and if the app does
+# not answer afterwards, put the previous commit back.
+#
+# This is the ONLY thing the GitHub Actions key is allowed to run: its entry in
+# /root/.ssh/authorized_keys carries a forced `command=`, so a leaked CI key can
+# deploy this app and nothing else. It cannot open a shell, read /root, or touch
+# the other site on this box. That is why the script takes no arguments — there
+# is nothing an attacker could pass it.
+#
+# Run by hand any time:  /usr/local/bin/agencyos-deploy
+
+set -euo pipefail
+
+APP_DIR=/srv/agencyos
+APP_USER=agencyos
+SERVICE=agencyos
+BRANCH=main
+SOCKET=/run/agencyos/gunicorn.sock
+HEALTH_PATH=/accounts/login/
+LOG=/var/log/agencyos-deploy.log
+LOCK=/var/lock/agencyos-deploy.lock
+
+# The health request has to look like one nginx would forward, or it is not a
+# test of anything:
+#
+#   Host:              must be in ALLOWED_HOSTS, or Django answers 400
+#                      DisallowedHost no matter how healthy the app is. Read
+#                      from .env so changing the domain does not silently turn
+#                      this check into a permanent rollback trigger.
+#   X-Forwarded-Proto: SECURE_SSL_REDIRECT=True means a request Django thinks
+#                      is plain HTTP gets a 301 and never reaches a view.
+#                      Gunicorn maps this header onto wsgi.url_scheme itself
+#                      (its secure_scheme_headers default), which is how real
+#                      traffic through nginx avoids the same redirect.
+#
+# Together they make the check exercise URL resolution, the view and the
+# template — a 200, not just "the socket accepted a connection".
+HEALTH_HOST=$(grep -m1 -oP '^\s*ALLOWED_HOSTS=\K[^,]+' /srv/agencyos/.env 2>/dev/null | tr -d ' \r' || true)
+HEALTH_HOST=${HEALTH_HOST:-za-an.com}
+
+as_app() { sudo -u "$APP_USER" -H "$@"; }
+
+# Does the app answer on its socket? Gunicorn needs a moment to boot and to
+# import Django, so this polls rather than asking once and giving up.
+healthy() {
+  local attempt code
+  for attempt in $(seq 1 15); do
+    sleep 2
+    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 \
+             -H "Host: ${HEALTH_HOST}" \
+             -H 'X-Forwarded-Proto: https' \
+             --unix-socket "$SOCKET" "http://localhost${HEALTH_PATH}" 2>/dev/null || true)
+    case "$code" in
+      200) echo "  health: HTTP 200 after ${attempt} attempt(s)"; return 0 ;;
+      # A redirect still proves Django imported and ran its middleware, so it is
+      # not worth rolling back a good deploy over — but say so, because drifting
+      # off 200 means the request stopped reaching the login view.
+      301|302) echo "  health: HTTP $code after ${attempt} attempt(s) — alive, but expected 200"; return 0 ;;
+    esac
+  done
+  echo "  health: last response '${code:-none}' after ${attempt} attempts (Host: ${HEALTH_HOST})"
+  return 1
+}
+
+# pip is the slow step, so it only runs when requirements.txt actually moved.
+install_deps_if_changed() {
+  local before="$1" after="$2"
+  if [ "$before" != "$after" ]; then
+    echo "requirements.txt changed — installing"
+    as_app .venv/bin/pip install -q -r requirements.txt
+  else
+    echo "requirements.txt unchanged — skipping pip"
+  fi
+}
+
+build_and_restart() {
+  as_app .venv/bin/python manage.py migrate --noinput
+  as_app .venv/bin/python manage.py collectstatic --noinput
+  systemctl restart "$SERVICE"
+}
+
+main() {
+  echo "=== agencyos deploy $(date -Is) ==="
+  cd "$APP_DIR"
+
+  local previous target req_before req_after
+  previous=$(as_app git rev-parse HEAD)
+  req_before=$(sha256sum requirements.txt | cut -d' ' -f1)
+  echo "on:  $previous"
+
+  as_app git fetch --prune origin "$BRANCH"
+  target=$(as_app git rev-parse "origin/$BRANCH")
+
+  if [ "$previous" = "$target" ]; then
+    echo "already at origin/$BRANCH — nothing to do"
+    return 0
+  fi
+
+  echo "to:  $target"
+  as_app git log --oneline "$previous..$target" | sed 's/^/     /'
+
+  # reset --hard, not pull: the server mirrors origin/main exactly, and a merge
+  # conflict from something edited on the box would otherwise stop a deploy
+  # halfway. Untracked files are left alone, so .env survives this.
+  as_app git reset --hard "$target"
+  req_after=$(sha256sum requirements.txt | cut -d' ' -f1)
+
+  install_deps_if_changed "$req_before" "$req_after"
+  build_and_restart
+
+  if healthy; then
+    echo "=== deployed $target ==="
+    return 0
+  fi
+
+  # Roll the CODE back. Migrations are NOT reversed — Django migrations are
+  # normally additive, so the previous code runs against the new schema, and
+  # guessing at a backwards migration on live data is far more dangerous than
+  # the mismatch. If the rollback is also unhealthy, the schema is the first
+  # thing to look at by hand.
+  echo "!!! health check failed — rolling back to $previous"
+  as_app git reset --hard "$previous"
+  install_deps_if_changed "$req_after" "$req_before"
+  as_app .venv/bin/python manage.py collectstatic --noinput
+  systemctl restart "$SERVICE"
+
+  if healthy; then
+    echo "!!! rolled back to $previous — the site is up on the OLD code"
+  else
+    echo "!!! ROLLBACK IS ALSO UNHEALTHY — the site is down, look at:"
+    echo "!!!   journalctl -u $SERVICE -n 80 --no-pager"
+  fi
+  return 1
+}
+
+# One deploy at a time. Two pushes half a minute apart would otherwise run
+# git reset and migrate over each other.
+exec 9>"$LOCK"
+if ! flock -w 300 9; then
+  echo "another deploy has held the lock for 5 minutes — giving up"
+  exit 1
+fi
+
+main 2>&1 | tee -a "$LOG"
+exit "${PIPESTATUS[0]}"

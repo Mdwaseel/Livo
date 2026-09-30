@@ -1,0 +1,7 @@
+{% comment %}
+Decides grid or list BEFORE the calendar paints, so nobody sees both layouts
+flash and collapse into one. Inline and first inside the root on purpose: a
+deferred script runs after first paint, which is exactly the flash this avoids.
+Grid on wide screens, list on phones, and whatever the reader last chose wins.
+{% endcomment %}
+<script>(function(root){if(root.getAttribute("data-view"))return;var v=null;try{v=localStorage.getItem("cc-view")}catch(e){}root.setAttribute("data-view",v==="grid"||v==="list"?v:(window.matchMedia("(max-width: 720px)").matches?"list":"grid"))})(document.currentScript.parentNode);</script>

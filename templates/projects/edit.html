@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block crumb %}<a href="{{ project.client.get_absolute_url }}">{{ project.client.name }}</a> / <a href="{{ project.get_absolute_url }}">{{ project.name }}</a> / Edit{% endblock %}
+{% block content %}
+<div class="page-head"><div><h2>Edit project</h2><p>{{ project.client.name }}</p></div></div>
+<form method="post" style="max-width:640px">
+  {% csrf_token %}
+  <div class="card"><div class="card-b">
+    <div class="field"><label>Project name *</label>
+      <input name="name" required value="{{ project.name }}"></div>
+    <div class="row" style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="field"><label>Status</label>
+        <select name="status">
+          {% for value, label in statuses %}
+            <option value="{{ value }}" {% if project.status == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select></div>
+      <div class="field"><label>Project type</label>
+        <input name="project_type" value="{{ project.project_type }}" placeholder="Website, E-commerce…"></div>
+      <div class="field"><label>Start date</label>
+        <input type="date" name="start_date" value="{{ project.start_date|date:'Y-m-d' }}"></div>
+      <div class="field"><label>Target end date</label>
+        <input type="date" name="target_end_date" value="{{ project.target_end_date|date:'Y-m-d' }}"></div>
+    </div>
+    <div class="field"><label>Project value (INR)</label>
+      <input type="number" name="budget" step="0.01" min="0" value="{{ project.budget|default:'' }}" placeholder="Agreed value"></div>
+    <div class="field"><label>Description</label>
+      <textarea name="description">{{ project.description }}</textarea></div>
+    <div class="divider">Quick links</div>
+    <div class="field"><label>Live site URL</label>
+      <input type="url" name="live_url" value="{{ project.live_url }}" placeholder="https://…"></div>
+    <div class="field"><label>Staging URL</label>
+      <input type="url" name="staging_url" value="{{ project.staging_url }}" placeholder="https://…"></div>
+    <div class="field"><label>Repository URL</label>
+      <input type="url" name="repo_url" value="{{ project.repo_url }}" placeholder="https://…"></div>
+    <div class="field"><label>Asset folder URL</label>
+      <input type="url" name="assets_url" value="{{ project.assets_url }}" placeholder="Drive / Dropbox folder"></div>
+  </div></div>
+  <div style="margin-top:16px;display:flex;gap:10px">
+    <button class="btn" type="submit">Save changes</button>
+    <a href="{{ project.get_absolute_url }}" class="btn ghost">Cancel</a>
+  </div>
+</form>
+{% if can.approve %}
+<div class="card" style="max-width:640px;margin-top:22px;border-color:#f0cccc">
+  <div class="card-h"><h3 style="color:var(--danger)">Danger zone</h3></div>
+  <div class="card-b" style="display:flex;align-items:center;justify-content:space-between;gap:14px">
+    <p style="color:var(--ink-soft);font-size:13px;margin:0">
+      Deleting this project also deletes its tasks, documents and payment records. This cannot be undone.</p>
+    <form method="post" action="{% url 'projects:delete' project.pk %}"
+          onsubmit="return confirm('Delete “{{ project.name|escapejs }}”? Its documents will be deleted too. This cannot be undone.')">
+      {% csrf_token %}<button type="submit" class="btn sm danger">Delete project</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

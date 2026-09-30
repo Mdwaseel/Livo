@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block crumb %}{% if client %}<a href="{{ client.get_absolute_url }}">{{ client.name }}</a> / {% else %}<a href="{% url 'projects:list' %}">Projects</a> / {% endif %}New project{% endblock %}
+{% block content %}
+<div class="page-head"><div><h2>New project</h2>
+  <p>{% if client %}For {{ client.name }}.{% else %}Pick the client this project belongs to.{% endif %}</p></div></div>
+<form method="post" style="max-width:560px">
+  {% csrf_token %}
+  <div class="card"><div class="card-b">
+    {% if not client %}
+    <div class="field"><label>Client *</label>
+      <select name="client" required>
+        <option value="" disabled selected>Choose a client…</option>
+        {% for c in clients %}
+          <option value="{{ c.pk }}">{{ c.name }}</option>
+        {% endfor %}
+      </select>
+      {% if can.clients %}
+      <div style="margin-top:6px;font-size:12.5px">
+        <a href="{% url 'clients:create' %}" style="color:var(--primary)">+ Add a new client</a>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+    <div class="field"><label>Project name *</label><input name="name" required
+      placeholder="e.g. {% if client %}{{ client.name }} {% endif %}E-commerce Site"></div>
+    <div class="field"><label>Project type</label><input name="project_type"
+      placeholder="Website, E-commerce, Mobile App…"></div>
+    <div class="field"><label>Description</label><textarea name="description"></textarea></div>
+  </div></div>
+  <div style="margin-top:16px;display:flex;gap:10px">
+    <button class="btn" type="submit">Create project</button>
+    <a href="{% if client %}{{ client.get_absolute_url }}{% else %}{% url 'projects:list' %}{% endif %}" class="btn ghost">Cancel</a>
+  </div>
+</form>
+{% endblock %}

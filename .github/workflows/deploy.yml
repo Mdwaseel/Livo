@@ -1,0 +1,116 @@
+# Push to main -> smoke check -> deploy to the VPS.
+#
+# The deploy step opens one SSH connection and sends nothing: the key's entry in
+# /root/.ssh/authorized_keys carries a forced `command=`, so connecting IS the
+# deploy. Whatever this workflow asks for, the server runs
+# /usr/local/bin/agencyos-deploy and nothing else. See DEPLOYMENT.md, "Automatic
+# deploys".
+#
+# Only one secret is needed: VPS_SSH_KEY, the private half of the CI key.
+# The host and its public host key are not secret and live in the repo, so a
+# change of server is a visible commit rather than a silent settings edit.
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  # So a failed deploy can be retried, and the server can be re-synced, without
+  # inventing an empty commit.
+  workflow_dispatch:
+
+concurrency:
+  # Never two deploys at once. `cancel-in-progress: false` because the thing
+  # already running is talking to the live site — let it finish and roll back
+  # cleanly if it must, rather than killing it halfway through a migrate.
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  VPS_HOST: 66.116.242.39
+  VPS_USER: root
+
+jobs:
+  check:
+    name: Smoke check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # Production-shaped settings, so these checks exercise what actually runs
+      # on the server rather than the developer defaults. None of it is a real
+      # credential: nothing here touches the live database or the live site.
+      DEBUG: "False"
+      SECRET_KEY: ci-smoke-check-only-not-the-production-key-000000000000
+      ALLOWED_HOSTS: za-an.com,www.za-an.com
+      SECURE_SSL_REDIRECT: "True"
+      SESSION_COOKIE_SECURE: "True"
+      CSRF_COOKIE_SECURE: "True"
+      SECURE_HSTS_SECONDS: "31536000"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # Matches the VPS (Ubuntu 22.04 ships 3.10). A check that passes on a
+          # newer Python than production is not the check we want.
+          python-version: "3.10"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Django checks, as production
+        run: python manage.py check --deploy
+
+      - name: Every model change has a migration
+        # Catches the commit that edits a model and forgets makemigrations.
+        # On the server that would surface as a runtime column error, long
+        # after the deploy reported success.
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Static files build
+        # ManifestStaticFilesStorage rewrites every url() it finds while
+        # collecting. A stylesheet pointing at an image that is not in the repo
+        # fails here, which is the difference between a red tick and an
+        # unstyled live site.
+        run: python manage.py collectstatic --noinput
+
+  deploy:
+    name: Deploy to VPS
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SSH_KEY:-}" ]; then
+            echo "::error::VPS_SSH_KEY secret is not set - see DEPLOYMENT.md, 'Automatic deploys'"
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          # StrictHostKeyChecking=yes against a host key committed to this repo:
+          # accepting whatever key answers on the day would let anyone who can
+          # get between Actions and the VPS collect this key.
+          cp .github/known_hosts ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key \
+              -o IdentitiesOnly=yes \
+              -o StrictHostKeyChecking=yes \
+              -o UserKnownHostsFile=~/.ssh/known_hosts \
+              -o ConnectTimeout=20 \
+              "${VPS_USER}@${VPS_HOST}" deploy
+
+      - name: Clean up the key
+        # The runner is thrown away anyway, but a key left on disk through
+        # later steps is a key a later step could read.
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

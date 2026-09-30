@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block crumb %}Analytics{% endblock %}
+
+{% block content %}
+<div class="page-head"><div><h2>Analytics</h2></div></div>
+<div class="card"><div class="empty">
+  {% if unknown_export %}
+    <h3>Nothing to export there</h3>
+    <p>That export doesn't exist. Pick a dataset from one of the analytics pages.</p>
+  {% else %}
+    <h3>Finance analytics is restricted</h3>
+    <p>Revenue and outstanding balances need the Finance module's
+       <strong>view</strong> permission, which is granted in
+       Settings → Roles. Delivery and people analytics are still open to you.</p>
+  {% endif %}
+  <a class="btn sm" href="{% url 'analytics:dashboard' %}">Back to analytics</a>
+</div></div>
+{% endblock %}

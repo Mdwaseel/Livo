@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block crumb %}Notifications{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h2>Notifications</h2><p>Approvals and status changes that involve you.</p></div>
+</div>
+<div class="card">
+  {% if items %}
+  <div class="card-b" style="padding:6px 20px">
+  {% for n in items %}
+    <div class="vrow" {% if not n.is_read %}style="background:var(--primary-soft);margin:0 -14px;padding:10px 14px;border-radius:8px"{% endif %}>
+      <div>
+        {% if n.url %}<a href="{{ n.url }}" style="font-weight:600">{{ n.text }}</a>
+        {% else %}<span style="font-weight:600">{{ n.text }}</span>{% endif %}
+        <br><span style="color:var(--ink-soft);font-size:12px">{{ n.created_at|date:"d M Y, H:i" }}</span>
+      </div>
+      {% if not n.is_read %}<span class="tag">new</span>{% endif %}
+    </div>
+  {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty"><h3>All caught up</h3><p>You'll be notified when documents need your attention.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

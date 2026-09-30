@@ -1,0 +1,12 @@
+# SSH host keys for the production VPS (za-an.com / 66.116.242.39).
+#
+# Host keys are public — this file holds no secret. It is committed so the
+# deploy workflow can use StrictHostKeyChecking=yes: without a key pinned ahead
+# of time, CI would have to trust whatever answers on the day, and anyone able
+# to sit between GitHub and the VPS could harvest the deploy key.
+#
+# Read off the server itself (/etc/ssh/ssh_host_*_key.pub) on 2026-09-01.
+# If these ever change, the deploy fails loudly rather than quietly connecting
+# to the wrong machine — regenerate them deliberately after a server rebuild.
+66.116.242.39 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDe2WCQs1iQSX6RCpfUy8qwvtLOvtNTegD2YRNOvctXi
+66.116.242.39 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDI67N6N/glK5hQqlslYnPHWyofDXrJMHzuG4IF0wx+NxYgeanMvQ8qH39fCz3fn9Jqd7qG70pfQxLX8qrhsm41Ekb8Zcq5lmUa93w9YAYh59KjZv+BHZYMKehvPKvIxuEebr4hhvpE4e4Gfpb13uKg9bPusHqS1RVaDBWocsCFt76tpyUoV659V4ckJUqO/V8cPmMyYR+82hMm+VOKMn1X3w9RFgrgJL/eA1T4JalI79sXEQbDzpuFh3mOJhLtXSOJjz5Dfj9HtyGePTFjRvwJ65LV0WN9T2dfMu/Us7iovaa6vTjIOFCli4PEX63ZWPCh5rVYB+wxFRW3xDLUU/Zx81c9zpwT5sfWdxYzH+wgwT3XU1wz7+PFgU406XX75gh9dWUL9aPayNlpJ1S7tbzqmmoiXWmp/Tq6ZrFX+e2zHbSkyCdX7bjRHcgkBjpQL8rURovaOLvYXPeqIZEHuz3d79CznZ46JlICrzpstHM/yBwN/u3et9llg07uW9GWNxU=

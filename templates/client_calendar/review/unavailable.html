@@ -1,0 +1,23 @@
+{% extends "client_calendar/review/_base.html" %}
+{% load static client_calendar_tags %}
+{% block title %}Not available{% endblock %}
+
+{% block content %}
+{% comment %}Names nobody: whoever holds a dead link may not be the person it was for.{% endcomment %}
+<section class="cc-gone">
+  <div class="cc-gone-card">
+    <span class="cc-gone-ico">{% cc_icon "lock" %}</span>
+    {% if reason == "off" %}
+      <h1>This link is no longer active</h1>
+      <p>Access to these approvals has been switched off.</p>
+    {% elif reason == "request" %}
+      <h1>This item isn't available</h1>
+      <p>It may have been removed, or it was sent to someone else.</p>
+    {% else %}
+      <h1>We couldn't find this page</h1>
+      <p>The link may be incomplete — check that the whole address was copied from the email.</p>
+    {% endif %}
+    <p>Ask your contact at {{ agency.agency_name|default:"Livo Digital" }} to send it again{% if agency.email %}, or write to <a href="mailto:{{ agency.email }}">{{ agency.email }}</a>{% endif %}.</p>
+  </div>
+</section>
+{% endblock %}

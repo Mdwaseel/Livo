@@ -1,0 +1,44 @@
+{% comment %}
+An asset is either a stored file or a link to one held on Drive (anything over
+the upload ceiling). `a.url` resolves to whichever it is; `a.is_link` picks the
+chain icon and the "lives elsewhere" wording.
+{% endcomment %}
+{% comment %}
+The thumbnail and the title below it are the same link to the same file. For a
+mouse that redundancy is a bigger target; for a keyboard it is two stops per
+asset and, in the icon cases, the first one announces as an unnamed link. So the
+thumbnail is marked decorative — clickable, out of the tab order — and the
+titled link underneath is the single accessible affordance. `tabindex="-1"` is
+what makes `aria-hidden` legitimate here: hiding a focusable element would
+otherwise strand focus on something screen readers cannot announce.
+{% endcomment %}
+<div class="asset">
+  {% if a.is_image %}
+  <a href="{{ a.url }}" target="_blank" rel="noopener" class="asset-thumb"
+     tabindex="-1" aria-hidden="true">
+    <img src="{{ a.url }}" alt="" loading="lazy">
+  </a>
+  {% elif a.is_link %}
+  <a href="{{ a.url }}" target="_blank" rel="noopener noreferrer" class="asset-thumb file"
+     tabindex="-1" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>
+  </a>
+  {% else %}
+  <a href="{{ a.url }}" target="_blank" rel="noopener" class="asset-thumb file"
+     tabindex="-1" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+  </a>
+  {% endif %}
+  <div class="asset-body">
+    <a href="{{ a.url }}" target="_blank" rel="noopener{% if a.is_link %} noreferrer{% endif %}"><strong>{{ a.title }}</strong></a>
+    {% if a.is_link %}<span class="tag gray" title="Held on Drive, not on this server">link</span>{% endif %}
+    {% if a.is_report_proof %}<span class="tag ok" title="Featured in monthly report">report</span>{% endif %}
+    {% if a.notes %}<div style="color:var(--ink-soft);font-size:11.5px">{{ a.notes|truncatechars:60 }}</div>{% endif %}
+    <div style="color:var(--ink-faint);font-size:11px">{{ a.created_at|date:"d M Y" }}{% if a.uploaded_by %} · {{ a.uploaded_by.get_full_name|default:a.uploaded_by.username }}{% endif %}</div>
+  </div>
+  {% if can.delivery %}
+  <form method="post" action="{% url 'projects:asset_delete' a.pk %}" onsubmit="return confirm('Delete asset “{{ a.title }}”? {% if a.is_link %}The link goes; the Drive file stays.{% else %}The file will be removed.{% endif %}')">
+    {% csrf_token %}<button type="submit" class="link-danger" style="margin-left:0">Delete</button>
+  </form>
+  {% endif %}
+</div>

@@ -1,0 +1,57 @@
+{% extends "analytics/_base.html" %}
+{% load analytics_tags %}
+
+{% block heading %}Employee analytics{% endblock %}
+{% block lede %}Hours, throughput and utilisation per person for the selected range.{% endblock %}
+
+{% block analytics %}
+<div class="chart-grid">
+  {% include "analytics/_chart_card.html" with chart_id="employee-utilization" title="Utilisation" caption="Logged hours as a share of a full-time norm (8 h × working days). Over 100% means overtime." height=340 empty="Nobody has logged hours in this range, so utilisation cannot be calculated." %}
+  {% include "analytics/_chart_card.html" with chart_id="hours-trend" title="Productivity trend" caption="Billable (solid) and non-billable (dashed) hours per day." height=340 empty="No work logged in this range. Hours appear here as your team files work logs." %}
+</div>
+
+<div class="card" style="margin-top:18px">
+  <div class="card-h"><h3>Per employee</h3><span class="tag gray">{{ rows|length }}</span></div>
+  {% if rows %}
+  <div class="table-wrap"><table>
+    <thead><tr>
+      <th>Person</th><th>Department</th>
+      <th title="Total hours logged in range">Hours</th>
+      <th title="Averaged over days actually worked">Avg / day</th>
+      <th>Avg / week</th>
+      <th>Done</th>
+      <th title="Average days from task creation to completion">Cycle</th>
+      <th>Billable</th><th>Utilisation</th><th>Approved</th>
+      <th title="Open tasks past their due date">Overdue</th>
+    </tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        {% comment %}
+        The utilisation chart above drills to this same URL when a bar is
+        clicked. The link is how that destination is reached without a mouse.
+        {% endcomment %}
+        <td>{% employee_filter_url r.user querystring as person_url %}
+          <a href="{{ person_url }}"><strong>{{ r.user.get_full_name|default:r.user.username }}</strong></a></td>
+        <td class="cell-sub">{{ r.department.name|default:"—" }}</td>
+        <td>{{ r.total_hours|floatformat:"-2" }}</td>
+        <td>{% if r.avg_daily_hours %}{{ r.avg_daily_hours|floatformat:"-2" }}{% else %}—{% endif %}</td>
+        <td>{% if r.avg_weekly_hours %}{{ r.avg_weekly_hours|floatformat:"-2" }}{% else %}—{% endif %}</td>
+        <td>{{ r.tasks_completed }}</td>
+        <td>{% if r.avg_completion_days is not None %}{{ r.avg_completion_days }} d{% else %}—{% endif %}</td>
+        <td>{{ r.billable_percent|floatformat:"0" }}%</td>
+        {# The bar is decoration; the number beside it is the value. #}
+        <td><span class="meter" aria-hidden="true"><i class="{% if r.utilization_percent > 110 %}over{% elif r.utilization_percent >= 70 %}good{% else %}low{% endif %}"
+              style="width:{% if r.utilization_percent > 100 %}100{% else %}{{ r.utilization_percent|floatformat:'0' }}{% endif %}%"></i></span>
+          {{ r.utilization_percent|floatformat:"0" }}%</td>
+        <td>{{ r.approval_percent|floatformat:"0" }}%</td>
+        <td>{% if r.overdue_tasks %}<span class="tag danger">{{ r.overdue_tasks }}</span>{% else %}—{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody></table></div>
+  {% else %}
+  <div class="empty"><h3>Nothing to report</h3>
+    <p>No active employees match these filters, or nothing was logged in this range.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

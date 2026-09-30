@@ -1,0 +1,18 @@
+Hi {{ assignee.get_full_name|default:assignee.username }},
+
+{% if actor %}{{ actor.get_full_name|default:actor.username }} assigned you a task.{% else %}A task has been assigned to you.{% endif %}
+
+    {{ task.title }}
+
+Project:   {{ project.name }}{% if client %} · {{ client.name }}{% endif %}
+Priority:  {{ task.get_priority_display }}
+{% if task.due_date %}Due:       {{ task.due_date|date:"D, d M Y" }}
+{% endif %}{% if task.estimated_hours %}Estimate:  {{ task.estimated_hours|floatformat:"-2" }} h
+{% endif %}{% if task.reviewer %}Reviewer:  {{ task.reviewer.get_full_name|default:task.reviewer.username }}
+{% endif %}{% if task.description %}
+{{ task.description }}
+{% endif %}{% if url %}
+Open it here:
+{{ url }}
+{% endif %}
+-- Livo OS

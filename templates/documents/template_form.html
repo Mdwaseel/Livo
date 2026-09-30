@@ -1,0 +1,320 @@
+{% extends "base.html" %}
+{% block title %}{% if template %}{{ template.name }}{% else %}New template{% endif %} · Livo OS{% endblock %}
+{% block crumb %}<a href="{% url 'doc_templates:list' %}">Templates</a> / {% if template %}{{ template.name }}{% else %}New{% endif %}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h2>{% if template %}Edit template{% else %}New template{% endif %}</h2>
+    <p>Every page is optional — upload only the ones you want and the rest are left out of the
+       PDF. For a content page that stays the same on every document, upload just the
+       content-page background, leave the document type on “Any” and tick Default.</p></div>
+</div>
+
+<form method="post" enctype="multipart/form-data" id="tpl-form">
+  {% csrf_token %}
+  <div style="display:grid;grid-template-columns:minmax(280px,360px) minmax(320px,1fr);gap:22px;align-items:start">
+
+    <!-- left: details + cover -->
+    <div>
+      <div class="card">
+        <div class="card-b">
+          <div class="field"><label>Template name *</label>
+            <input name="name" required maxlength="120" value="{{ template.name|default:'' }}"
+                   placeholder="e.g. Brand 2026 — Proposal"></div>
+          <div class="field"><label>Document type</label>
+            <select name="document_type">
+              <option value="">Any document type</option>
+              {% for dt in doc_types %}
+                <option value="{{ dt.pk }}"
+                  {% if template.document_type_id == dt.pk %}selected{% endif %}>{{ dt.name }}</option>
+              {% endfor %}
+            </select>
+            <div class="hint">Set this to <strong>“Any”</strong> to make the pages below apply to
+              every document type. Each of the three pages is filled in separately, so a template
+              with only a content background becomes the universal content page, and one with only
+              a last page becomes the universal thank-you page — even for document types that
+              already have their own cover.</div></div>
+          <div class="field" style="margin-bottom:0">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+              <input type="checkbox" name="is_default" style="width:auto"
+                     {% if template.is_default %}checked{% endif %}>
+              Default template for this document type</label></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <div class="card-b">
+          {% if inherited %}
+          {% comment %}
+          Naming the source matters: without it, a cover that arrives from the
+          universal template looks identical to one this template defines, and
+          the first thing anyone does is upload a duplicate.
+          {% endcomment %}
+          <div class="hint" style="margin-bottom:12px">
+            Leave a page empty and it is inherited:
+            {% for label, source in inherited.items %}<strong>{{ label }}</strong> from
+              “{{ source }}”{% if not forloop.last %}, {% endif %}{% endfor %}.
+          </div>
+          {% endif %}
+          <div class="field" style="margin-bottom:10px"><label>Cover image (page 1, A4)</label>
+            <input type="file" name="cover_image" accept="image/*" data-preview="cover-preview"
+                   data-max-bytes="{{ template_upload_max_bytes }}">
+            <div class="hint">Optional. Leave it empty and the document starts straight on the
+              content page.</div>
+            {% if template.cover_image %}
+              <label class="rm-page"><input type="checkbox" name="remove_cover_image">
+                Remove the current cover page</label>
+            {% endif %}</div>
+          <div class="field" style="margin-bottom:10px"><label>Last page (constant back / thank-you, A4)</label>
+            <input type="file" name="back_image" accept="image/*" data-preview="back-preview"
+                   data-max-bytes="{{ template_upload_max_bytes }}">
+            <div class="hint">Optional. Closes every document generated with this template.</div>
+            {% if template.back_image %}
+              <label class="rm-page"><input type="checkbox" name="remove_back_image">
+                Remove the current last page</label>
+            {% endif %}</div>
+          <div style="display:flex;gap:12px">
+            <div class="a4-frame" style="flex:1;max-width:170px">
+              <img id="cover-preview" alt="Cover preview"
+                   {% if template.cover_image %}src="{{ template.cover_image.url }}"{% endif %}>
+              <span class="a4-ph">No cover page</span>
+            </div>
+            <div class="a4-frame" style="flex:1;max-width:170px">
+              <img id="back-preview" alt="Last page preview"
+                   {% if template.back_image %}src="{{ template.back_image.url }}"{% endif %}>
+              <span class="a4-ph">No last page</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- right: content page + draw-region tool -->
+    <div class="card">
+      <div class="card-b">
+        <div class="field" style="margin-bottom:10px"><label>Content-page background (pages 2+, A4)</label>
+          <input type="file" name="content_background" accept="image/*" data-preview="stage-bg"
+                   data-max-bytes="{{ template_upload_max_bytes }}">
+          <div class="hint">Optional, but this is the page that repeats behind all the document
+            text — the one to upload for a constant content page.</div>
+          {% if template.content_background %}
+            <label class="rm-page"><input type="checkbox" name="remove_content_background">
+              Remove the current content-page background</label>
+          {% endif %}</div>
+
+        <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
+          <div class="a4-frame" id="region-stage" tabindex="0" style="width:min(420px,100%);touch-action:none">
+            <img id="stage-bg" alt="" draggable="false"
+                 {% if template.content_background %}src="{{ template.content_background.url }}"{% endif %}>
+            <span class="a4-ph">Content page preview<br>(you can draw the region before uploading)</span>
+            <div id="region-rect">
+              <i data-handle="nw"></i><i data-handle="n"></i><i data-handle="ne"></i>
+              <i data-handle="w"></i><i data-handle="e"></i>
+              <i data-handle="sw"></i><i data-handle="s"></i><i data-handle="se"></i>
+            </div>
+          </div>
+          <div style="min-width:170px">
+            <div class="divider" style="margin:0 0 10px">Where the text goes</div>
+            {% comment %}
+            Stated as plainly as possible, because the natural reading of "content
+            region" is "where the content page goes" -- i.e. the background. Drawn
+            that way it covers the whole sheet, and the document then prints edge
+            to edge straight over the letterhead: logo behind the first line,
+            contact bar behind the last.
+            {% endcomment %}
+            <div class="hint" style="margin:-4px 0 10px">
+              The box on the left is where the document&rsquo;s <strong>text</strong> is
+              placed. Keep it clear of the logo and footer in your artwork &mdash;
+              the background always fills the whole page regardless of this box.
+            </div>
+            <table style="font-size:12.5px;line-height:2" id="region-readout">
+              <tr><td style="color:var(--ink-soft);padding-right:14px">Left (X)</td><td data-r="x">–</td></tr>
+              <tr><td style="color:var(--ink-soft)">Top (Y)</td><td data-r="y">–</td></tr>
+              <tr><td style="color:var(--ink-soft)">Width</td><td data-r="w">–</td></tr>
+              <tr><td style="color:var(--ink-soft)">Height</td><td data-r="h">–</td></tr>
+            </table>
+            <ul class="region-help">
+              <li><b>Drag</b> on the page to draw the text area</li>
+              <li><b>Ctrl</b> (or <b>Cmd</b>) + drag to move it without redrawing</li>
+              <li>Drag a <b>square handle</b> to resize one edge or corner</li>
+              <li>Click the page, then <b>arrow keys</b> to nudge (Shift = faster)</li>
+            </ul>
+            <input type="hidden" name="content_x" id="in-x" value="{{ region.x|stringformat:'g' }}">
+            <input type="hidden" name="content_y" id="in-y" value="{{ region.y|stringformat:'g' }}">
+            <input type="hidden" name="content_width" id="in-w" value="{{ region.width|stringformat:'g' }}">
+            <input type="hidden" name="content_height" id="in-h" value="{{ region.height|stringformat:'g' }}">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:18px;display:flex;gap:10px">
+    <button class="btn" type="submit">Save template</button>
+    <a href="{% url 'doc_templates:list' %}" class="btn ghost">Cancel</a>
+  </div>
+</form>
+
+<style>
+  .a4-frame{position:relative;aspect-ratio:210/297;background:
+    repeating-conic-gradient(#f2f4f3 0% 25%,#fafcfb 0% 50%) 50%/18px 18px;
+    border:1px solid var(--line);border-radius:8px;overflow:hidden;user-select:none}
+  .a4-frame img{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;display:none}
+  .a4-frame img[src]{display:block}
+  .a4-frame .a4-ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    text-align:center;color:var(--ink-faint);font-size:11.5px;font-weight:600;padding:12px;
+    pointer-events:none}
+  .a4-frame img[src] ~ .a4-ph{display:none}
+  .rm-page{display:flex;align-items:center;gap:7px;margin-top:7px;cursor:pointer;
+    font-size:12px;color:var(--ink-soft)}
+  .rm-page input{width:auto}
+  .region-help{margin:12px 0 0;padding-left:16px;font-size:11.5px;line-height:1.7;
+    color:var(--ink-soft)}
+  /* The rectangle body stays transparent to the pointer so a plain drag can always
+     redraw over it; only the handles and the Ctrl modifier grab it instead. */
+  #region-stage{cursor:crosshair;outline:none}
+  #region-stage:focus-visible{box-shadow:0 0 0 2px var(--primary)}
+  #region-stage.ctrl{cursor:move}
+  #region-rect{position:absolute;border:2px solid var(--primary);
+    background:rgba(0,121,91,.14);box-shadow:0 0 0 1px rgba(255,255,255,.7) inset;
+    pointer-events:none}
+  #region-rect i{position:absolute;width:11px;height:11px;margin:-6px 0 0 -6px;
+    box-sizing:border-box;background:#fff;border:2px solid var(--primary);border-radius:3px;
+    pointer-events:auto}
+  #region-stage.ctrl #region-rect i{pointer-events:none}
+  #region-rect i[data-handle=nw]{left:0;top:0;cursor:nwse-resize}
+  #region-rect i[data-handle=n]{left:50%;top:0;cursor:ns-resize}
+  #region-rect i[data-handle=ne]{left:100%;top:0;cursor:nesw-resize}
+  #region-rect i[data-handle=w]{left:0;top:50%;cursor:ew-resize}
+  #region-rect i[data-handle=e]{left:100%;top:50%;cursor:ew-resize}
+  #region-rect i[data-handle=sw]{left:0;top:100%;cursor:nesw-resize}
+  #region-rect i[data-handle=s]{left:50%;top:100%;cursor:ns-resize}
+  #region-rect i[data-handle=se]{left:100%;top:100%;cursor:nwse-resize}
+</style>
+
+<script>
+(() => {
+  const stage = document.getElementById('region-stage');
+  const rect = document.getElementById('region-rect');
+  const inputs = {x: document.getElementById('in-x'), y: document.getElementById('in-y'),
+                  w: document.getElementById('in-w'), h: document.getElementById('in-h')};
+  const readout = document.getElementById('region-readout');
+
+  const MIN = 2;                                 // smallest usable region, % of the page
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const num = (v, fallback) => Number.isFinite(parseFloat(v)) ? parseFloat(v) : fallback;
+
+  // The one source of truth, seeded from the saved (or default) region.
+  let region = {x: clamp(num(inputs.x.value, 8), 0, 100),
+                y: clamp(num(inputs.y.value, 12), 0, 100),
+                w: clamp(num(inputs.w.value, 84), MIN, 100),
+                h: clamp(num(inputs.h.value, 76), MIN, 100)};
+  let drag = null;   // {mode: draw|move|resize, origin, base, handle}
+
+  const point = e => {
+    const b = stage.getBoundingClientRect();
+    return {x: clamp((e.clientX - b.left) / b.width * 100, 0, 100),
+            y: clamp((e.clientY - b.top) / b.height * 100, 0, 100)};
+  };
+
+  function paint() {
+    rect.style.left = region.x + '%';
+    rect.style.top = region.y + '%';
+    rect.style.width = region.w + '%';
+    rect.style.height = region.h + '%';
+    inputs.x.value = region.x.toFixed(2); inputs.y.value = region.y.toFixed(2);
+    inputs.w.value = region.w.toFixed(2); inputs.h.value = region.h.toFixed(2);
+    for (const [k, v] of Object.entries(region))
+      readout.querySelector('[data-r=' + k + ']').textContent = v.toFixed(1) + '%';
+  }
+
+  // Move keeps the whole rectangle on the page rather than shrinking it at the edge.
+  function moveTo(x, y) {
+    region.x = clamp(x, 0, 100 - region.w);
+    region.y = clamp(y, 0, 100 - region.h);
+  }
+
+  // The handle name lists the edges that follow the pointer ("nw" = top + left);
+  // the others stay where they were when the drag started.
+  function resize(handle, p, base) {
+    let left = base.x, top = base.y, right = base.x + base.w, bottom = base.y + base.h;
+    if (handle.includes('w')) left = Math.min(p.x, right - MIN);
+    if (handle.includes('e')) right = Math.max(p.x, left + MIN);
+    if (handle.includes('n')) top = Math.min(p.y, bottom - MIN);
+    if (handle.includes('s')) bottom = Math.max(p.y, top + MIN);
+    region = {x: left, y: top, w: right - left, h: bottom - top};
+  }
+
+  function draw(origin, p) {
+    region = {x: Math.min(origin.x, p.x), y: Math.min(origin.y, p.y),
+              w: Math.abs(p.x - origin.x), h: Math.abs(p.y - origin.y)};
+  }
+
+  stage.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    stage.focus();
+    stage.setPointerCapture(e.pointerId);
+    const handle = e.target.dataset && e.target.dataset.handle;
+    const p = point(e), base = Object.assign({}, region);
+    if (e.ctrlKey || e.metaKey) drag = {mode: 'move', origin: p, base};
+    else if (handle) drag = {mode: 'resize', handle: handle, base: base};
+    else { drag = {mode: 'draw', origin: p, base: base}; draw(p, p); paint(); }
+  });
+
+  stage.addEventListener('pointermove', e => {
+    if (!drag) return;
+    const p = point(e);
+    if (drag.mode === 'draw') draw(drag.origin, p);
+    else if (drag.mode === 'move')
+      moveTo(drag.base.x + (p.x - drag.origin.x), drag.base.y + (p.y - drag.origin.y));
+    else resize(drag.handle, p, drag.base);
+    paint();
+  });
+
+  const finish = () => {
+    if (!drag) return;
+    // a click without a real drag shouldn't wipe the region — put it back
+    if (drag.mode === 'draw' && (region.w < MIN || region.h < MIN)) region = drag.base;
+    drag = null;
+    paint();
+  };
+  stage.addEventListener('pointerup', finish);
+  stage.addEventListener('pointercancel', finish);
+
+  // Ctrl/Cmd swaps the cursor so the move affordance is discoverable, not just documented.
+  const setCtrl = on => stage.classList.toggle('ctrl', on);
+  document.addEventListener('keydown', e => { if (e.ctrlKey || e.metaKey) setCtrl(true); });
+  document.addEventListener('keyup', e => { if (!e.ctrlKey && !e.metaKey) setCtrl(false); });
+  window.addEventListener('blur', () => setCtrl(false));
+
+  // Arrow keys nudge the region once the page has focus.
+  stage.addEventListener('keydown', e => {
+    const step = e.shiftKey ? 5 : 1;
+    const delta = {ArrowLeft: [-step, 0], ArrowRight: [step, 0],
+                   ArrowUp: [0, -step], ArrowDown: [0, step]}[e.key];
+    if (!delta) return;
+    e.preventDefault();
+    moveTo(region.x + delta[0], region.y + delta[1]);
+    paint();
+  });
+
+  paint();
+
+  // live previews for the page uploads, and a dimmed preview when one is cleared
+  document.querySelectorAll('input[type=file][data-preview]').forEach(input => {
+    input.addEventListener('change', () => {
+      const img = document.getElementById(input.dataset.preview);
+      if (input.files[0]) { img.src = URL.createObjectURL(input.files[0]); img.style.opacity = 1; }
+    });
+  });
+  document.querySelectorAll('.rm-page input').forEach(box => {
+    box.addEventListener('change', () => {
+      const field = box.name.replace('remove_', '');
+      const file = document.querySelector('input[type=file][name=' + field + ']');
+      const img = document.getElementById(file.dataset.preview);
+      img.style.opacity = box.checked ? .25 : 1;
+    });
+  });
+})();
+</script>
+{% endblock %}

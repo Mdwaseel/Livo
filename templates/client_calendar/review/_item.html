@@ -1,0 +1,18 @@
+{% load client_calendar_tags %}{% with a=item.activity %}
+<a class="rv-item fam-{{ a.family }}" href="{% url 'client_review:detail' reviewer.token item.pk %}">
+  <span class="rv-item-ico" aria-hidden="true">{% cc_icon a.kind_icon %}</span>
+  <span class="rv-item-main">
+    <span class="rv-item-title">{{ a.title }}</span>
+    <span class="rv-item-meta">{{ a.short_kind }}{% if a.platform %} · {{ a.get_platform_display }}{% endif %} · planned for {{ a.date|date:"D j M" }}{% if item.version > 1 %} · version {{ item.version }}{% endif %}</span>
+  </span>
+  <span class="rv-item-side">
+    {% if item.is_pending %}
+      {% if item.is_overdue %}<span class="rv-badge is-late">{% cc_icon "clock" %}Was due {{ item.respond_by|date:"j M" }}</span>
+      {% elif item.respond_by %}<span class="rv-badge is-warn">{% cc_icon "clock" %}Reply by {{ item.respond_by|date:"j M" }}</span>
+      {% else %}<span class="rv-badge is-warn">Ready to review</span>{% endif %}
+    {% elif item.status == "APPROVED" %}<span class="rv-badge is-ok">{% cc_icon "check" %}Approved</span>
+    {% else %}<span class="rv-badge is-changes">{% cc_icon "message" %}Changes asked</span>{% endif %}
+    {% cc_icon "chevron_right" "cc-ico rv-item-go" %}
+  </span>
+</a>
+{% endwith %}

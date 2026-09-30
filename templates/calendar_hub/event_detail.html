@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block crumb %}<a href="{% url 'calendar_hub:month' %}">Calendar</a> / {{ event.title }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>{{ event.title }}</h2>
+    <p>
+      <span class="tag gray">{{ event.get_kind_display }}</span>
+      {{ event.start_date|date:"l j F Y" }}
+      {% if event.is_all_day %}· all day{% else %}· {{ event.start_time|time:"H:i" }}{% if event.end_time %}–{{ event.end_time|time:"H:i" }}{% endif %}{% endif %}
+      {% if event.spans_days %}· through {{ event.end_date|date:"j F" }}{% endif %}
+      {% if event.is_recurring %}· <span class="tag warn">{{ event.recurrence_label }}</span>{% endif %}
+    </p>
+  </div>
+  {% if can_manage %}
+  <div class="head-actions">
+    <a class="btn sm ghost" href="{% url 'calendar_hub:event_edit' event.pk %}">Edit</a>
+    {% if can_delete or event.created_by_id == user.pk %}
+    <form method="post" action="{% url 'calendar_hub:event_delete' event.pk %}"
+          onsubmit="return confirm('Remove “{{ event.title|escapejs }}” from the calendar?')">
+      {% csrf_token %}
+      <button class="btn sm ghost" type="submit">Remove</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-h"><h3>Details</h3></div>
+    <div class="card-b">
+      <table class="kv">
+        <tr><td>Location</td><td>{{ event.location|default:"—" }}</td></tr>
+        <tr><td>Video call</td><td>{% if event.meeting_url %}<a href="{{ event.meeting_url }}" rel="noopener">Join</a>{% else %}—{% endif %}</td></tr>
+        <tr><td>Project</td><td>{% if event.project %}<a href="{{ event.project.get_absolute_url }}">{{ event.project.name }}</a>{% else %}—{% endif %}</td></tr>
+        <tr><td>Client</td><td>{{ event.client.name|default:"—" }}</td></tr>
+        <tr><td>Department</td><td>{{ event.department.name|default:"—" }}</td></tr>
+        <tr><td>Visibility</td><td>{{ event.get_visibility_display }}</td></tr>
+        <tr><td>Reminder</td><td>{% if event.reminder_minutes is not None %}{{ event.reminder_minutes }} minutes before{% else %}None{% endif %}</td></tr>
+        <tr><td>Organiser</td><td>{{ event.created_by.get_full_name|default:event.created_by.username|default:"—" }}</td></tr>
+      </table>
+      {% if event.description %}<div class="divider">Notes</div><p>{{ event.description|linebreaksbr }}</p>{% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><h3>Attendees</h3><span class="num">{{ attendees|length }}</span></div>
+    <div class="card-b">
+      {% if attendees %}
+        <ul class="tight-list">
+          {% for person in attendees %}<li>{{ person.get_full_name|default:person.username }}</li>{% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted">Nobody invited.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% if event.is_recurring %}
+<div class="card" style="margin-top:16px">
+  <div class="card-h"><h3>Exceptions to the series</h3></div>
+  <div class="card-b">
+    {% comment %}
+    Only the instances that differ from the rule are stored — the ordinary
+    occurrences of a daily stand-up are computed, never written down.
+    {% endcomment %}
+    {% if overrides %}
+      <table>
+        <thead><tr><th>Was</th><th>Now</th><th></th></tr></thead>
+        <tbody>
+          {% for override in overrides %}
+          <tr>
+            <td>{{ override.original_date|date:"D d M Y" }}</td>
+            <td>{% if override.is_cancelled %}<span class="tag danger">Skipped</span>{% else %}{{ override.moved_to|date:"D d M Y" }}{% endif %}</td>
+            <td style="text-align:right">
+              {% if can_manage %}
+              <form method="post" action="{% url 'calendar_hub:occurrence_restore' event.pk override.original_date|date:'Y-m-d' %}">
+                {% csrf_token %}
+                <button class="btn sm ghost" type="submit">Restore</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="muted">Every occurrence follows the rule.</p>
+    {% endif %}
+
+    {% if can_manage %}
+    <div class="divider">Skip one occurrence</div>
+    <form method="post" action="{% url 'calendar_hub:occurrence_cancel' event.pk %}" class="inline-form">
+      {% csrf_token %}
+      <label class="fb-field"><span>Date</span><input type="date" name="date" required></label>
+      <button class="btn sm ghost" type="submit">Skip it</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

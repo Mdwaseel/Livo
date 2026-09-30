@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% comment %}
+Shared shell for the five analytics pages: sub-navigation, the filter bar, and
+the single Chart.js initialiser every page reuses.
+
+The initialiser reads configs out of a {{ charts|json_script }} block rather
+than from inline <script> per canvas — one parse, no per-chart script tags, and
+nothing interpolated into JavaScript source where a project name containing a
+quote could break the page.
+{% endcomment %}
+
+{% block crumb %}Analytics{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>{% block heading %}Analytics{% endblock %}</h2>
+    <p>{% block lede %}Delivery, people and money across the agency.{% endblock %}</p>
+  </div>
+  {% if can_export and dataset %}
+  <div class="head-actions">
+    <a class="btn sm ghost" href="{% url 'analytics:export' dataset=dataset fmt='csv' %}?{{ querystring }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <span class="lbl">CSV</span></a>
+    <a class="btn sm" href="{% url 'analytics:export' dataset=dataset fmt='xlsx' %}?{{ querystring }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <span class="lbl">Excel</span></a>
+  </div>
+  {% endif %}
+</div>
+
+<nav class="subnav" aria-label="Analytics sections">
+  <a href="{% url 'analytics:dashboard' %}?{{ querystring }}" {% if active == 'dashboard' %}class="on" aria-current="page"{% endif %}>Overview</a>
+  <a href="{% url 'analytics:employees' %}?{{ querystring }}" {% if active == 'employees' %}class="on" aria-current="page"{% endif %}>Employees</a>
+  <a href="{% url 'analytics:projects' %}?{{ querystring }}" {% if active == 'projects' %}class="on" aria-current="page"{% endif %}>Projects</a>
+  <a href="{% url 'analytics:clients' %}?{{ querystring }}" {% if active == 'clients' %}class="on" aria-current="page"{% endif %}>Clients</a>
+  {% if can_view_finance %}
+  <a href="{% url 'analytics:finance' %}?{{ querystring }}" {% if active == 'finance' %}class="on" aria-current="page"{% endif %}>Finance</a>
+  {% endif %}
+</nav>
+
+<form method="get" class="card filter-card" role="search" aria-label="Analytics filters">
+  <div class="filter-bar">
+    <label class="fb-field"><span>From</span>
+      <input type="date" name="start" value="{{ filters.start|date:'Y-m-d' }}"></label>
+    <label class="fb-field"><span>To</span>
+      <input type="date" name="end" value="{{ filters.end|date:'Y-m-d' }}"></label>
+    <label class="fb-field"><span>Employee</span>
+      <select name="employee">
+        <option value="">All</option>
+        {% for u in options.employees %}
+          <option value="{{ u.pk }}" {% if filters.employee_id == u.pk %}selected{% endif %}>{{ u.get_full_name|default:u.username }}</option>
+        {% endfor %}
+      </select></label>
+    <label class="fb-field"><span>Department</span>
+      <select name="department">
+        <option value="">All</option>
+        {% for d in options.departments %}
+          <option value="{{ d.pk }}" {% if filters.department_id == d.pk %}selected{% endif %}>{{ d.name }}</option>
+        {% endfor %}
+      </select></label>
+    <label class="fb-field"><span>Client</span>
+      <select name="client">
+        <option value="">All</option>
+        {% for c in options.clients %}
+          <option value="{{ c.pk }}" {% if filters.client_id == c.pk %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+      </select></label>
+    <label class="fb-field"><span>Project</span>
+      <select name="project">
+        <option value="">All</option>
+        {% for p in options.projects %}
+          <option value="{{ p.pk }}" {% if filters.project_id == p.pk %}selected{% endif %}>{{ p.client.name }} — {{ p.name }}</option>
+        {% endfor %}
+      </select></label>
+    <button class="btn sm" type="submit">Apply</button>
+    {% if filters.is_filtered %}
+      <a class="btn sm ghost" href="{{ request.path }}">Clear</a>
+    {% endif %}
+    <span class="filter-count">{{ filters.days }} day{{ filters.days|pluralize }}</span>
+  </div>
+</form>
+
+{% block analytics %}{% endblock %}
+{% endblock %}
+
+{% block scripts %}
+{{ charts|json_script:"chart-configs" }}
+<script src="{% static 'js/chart.umd.js' %}"></script>
+{# The initialiser is shared with the business overview — see static/js/charts.js #}
+<script src="{% static 'js/charts.js' %}"></script>
+{% endblock %}

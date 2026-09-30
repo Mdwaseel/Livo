@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block crumb %}<a href="{{ project.client.get_absolute_url }}">{{ project.client.name }}</a> / <a href="{{ project.get_absolute_url }}">{{ project.name }}</a> / {% if payment %}Edit payment{% else %}Record payment{% endif %}{% endblock %}
+{% block content %}
+<div class="page-head"><div><h2>{% if payment %}Edit payment{% else %}Record payment{% endif %}</h2>
+  <p>{{ project.name }} · {{ project.client.name }}{% if project.budget %} · Project value ₹{{ project.budget|floatformat:"0g" }}{% endif %}</p></div></div>
+<form method="post" style="max-width:560px">
+  {% csrf_token %}
+  <div class="card"><div class="card-b">
+    <div class="field"><label>Amount (INR) *</label>
+      <input name="amount" type="number" step="0.01" min="0.01" required
+             value="{{ payment.amount|default:'' }}" placeholder="e.g. 25000"></div>
+    <div class="field"><label>Received on *</label>
+      <input name="received_on" type="date" required value="{{ payment.received_on|date:'Y-m-d' }}"></div>
+    <div class="field"><label>Payment type</label>
+      <select name="payment_type">
+        {% for value, label in types %}
+          <option value="{{ value }}" {% if payment and payment.payment_type == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select></div>
+    <div class="field"><label>Method</label>
+      <select name="method">
+        {% for value, label in methods %}
+          <option value="{{ value }}" {% if payment and payment.method == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select></div>
+    <div class="field"><label>Reference</label>
+      <input name="reference" value="{{ payment.reference|default:'' }}"
+             placeholder="Txn id / cheque no / UPI ref"></div>
+    <div class="field"><label>Linked invoice <span style="color:var(--ink-soft);font-weight:400">(optional)</span></label>
+      <select name="invoice">
+        <option value="">— None —</option>
+        {% for doc in invoices %}
+          <option value="{{ doc.pk }}" {% if payment and payment.invoice_id == doc.pk %}selected{% endif %}>{{ doc.number|default:doc.title }} · {{ doc.document_type.name }}</option>
+        {% endfor %}
+      </select></div>
+    <div class="field"><label>Notes</label>
+      <textarea name="notes" placeholder="Anything worth remembering about this payment">{{ payment.notes|default:'' }}</textarea></div>
+  </div></div>
+  <div style="margin-top:16px;display:flex;gap:10px">
+    <button class="btn" type="submit">{% if payment %}Save changes{% else %}Record payment{% endif %}</button>
+    <a href="{{ project.get_absolute_url }}" class="btn ghost">Cancel</a>
+  </div>
+</form>
+{% endblock %}

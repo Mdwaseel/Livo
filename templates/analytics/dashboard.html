@@ -1,0 +1,108 @@
+{% extends "analytics/_base.html" %}
+{% load analytics_tags %}
+
+{% block heading %}Analytics{% endblock %}
+{% block lede %}Delivery, people and money across the agency.{% endblock %}
+
+{% block analytics %}
+<div class="stat-grid">
+  {% for c in cards %}
+  <div class="stat{% if c.tone %} tone-{{ c.tone }}{% endif %}">
+    <div class="bar"></div>
+    <div class="n">{% if c.kind == 'money' %}₹{{ c.value|floatformat:"0g" }}{% elif c.kind == 'hours' %}{{ c.value|floatformat:"-2" }}{% else %}{{ c.value }}{% endif %}</div>
+    <div class="l">{{ c.label }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="chart-grid">
+  {% if can_view_finance %}
+    {% include "analytics/_chart_card.html" with chart_id="revenue-trend" title="Revenue trend" caption="Payments received per month in the selected range." empty="No payments received in this range." %}
+  {% endif %}
+  {% include "analytics/_chart_card.html" with chart_id="hours-trend" title="Hours trend" caption="Billable (solid) and non-billable (dashed) hours per day." empty="No work logged in this range. Hours appear here as your team files work logs." %}
+  {% include "analytics/_chart_card.html" with chart_id="billable-split" title="Billable vs non-billable" caption="Share of logged hours in the selected range." height=260 empty="No hours logged yet, so there is no billable split to show." %}
+  {% include "analytics/_chart_card.html" with chart_id="task-status" title="Task status" caption="Open tasks by board column, plus how many are overdue." height=260 empty="No tasks on the board in this range." %}
+  {% include "analytics/_chart_card.html" with chart_id="project-health" title="Project health" caption="Lowest-scoring projects first. 100 is healthy — click a bar to open the project." empty="No projects with activity in this range." %}
+  {% include "analytics/_chart_card.html" with chart_id="employee-utilization" title="Employee utilisation" caption="Logged hours against a full-time norm. Click a bar for that person's detail." empty="Nobody has logged hours in this range, so utilisation cannot be calculated." %}
+  {% include "analytics/_chart_card.html" with chart_id="department-hours" title="Hours by department" caption="Click a bar to filter this page to that department." height=260 empty="No hours logged against any department in this range." %}
+  {% include "analytics/_chart_card.html" with chart_id="department-tasks" title="Tasks completed by department" caption="Same departments, counted rather than timed." height=260 empty="No tasks completed by any department in this range." %}
+  {% if can_view_finance %}
+    {% include "analytics/_chart_card.html" with chart_id="monthly-growth" title="Growth" caption="Revenue, hours and completed tasks, each indexed to 100 at its starting month." empty="Not enough history yet — growth needs at least one month with figures in it." %}
+  {% endif %}
+</div>
+
+{% comment %}
+The table under the department charts is not decoration. Both of those charts
+drill through on click, and a click is a mouse; without a list carrying the same
+links, filtering by department would be unreachable from a keyboard. It doubles
+as the readable form of the two canvases for anyone using a screen reader.
+{% endcomment %}
+<div class="card" style="margin-top:18px">
+  <div class="card-h"><h3>Departments</h3>
+    <span class="hint">Same figures as the two charts above</span></div>
+  {% if departments %}
+  <div class="table-wrap"><table>
+    <thead><tr>
+      <th>Department</th><th>People</th><th>Hours</th>
+      <th>Billable</th><th style="text-align:right">Tasks completed</th>
+    </tr></thead>
+    <tbody>
+      {% for r in departments %}
+      <tr>
+        <td>{% department_filter_url r.department querystring as dept_url %}
+          <a href="{{ dept_url }}"><strong>{{ r.department.name }}</strong></a></td>
+        <td>{{ r.headcount }}</td>
+        <td>{{ r.hours|floatformat:"-2" }}</td>
+        <td>{{ r.billable_percent|floatformat:"0" }}%</td>
+        <td style="text-align:right">{{ r.tasks_completed }}</td>
+      </tr>
+      {% endfor %}
+    </tbody></table></div>
+  {% else %}<div class="empty" style="padding:24px"><p>No departments with work in this range.</p></div>{% endif %}
+</div>
+
+<div class="grid-2" style="margin-top:18px">
+  <div class="card">
+    <div class="card-h"><h3>Projects needing attention</h3>
+      <a href="{% url 'analytics:projects' %}?{{ querystring }}" class="card-link">All projects</a></div>
+    {% if top_projects %}
+    <div class="table-wrap"><table>
+      <thead><tr><th>Project</th><th>Completion</th><th>Risk</th><th style="text-align:right">Health</th></tr></thead>
+      <tbody>
+      {% for r in top_projects %}
+        <tr>
+          <td><a href="{{ r.project.get_absolute_url }}"><strong>{{ r.project.name }}</strong></a><br>
+            <span class="cell-sub">{{ r.client.name }}</span></td>
+          <td>{{ r.completion_percent|floatformat:"0" }}%</td>
+          <td><span class="tag {% if r.risk.level == 'HIGH' %}danger{% elif r.risk.level == 'MEDIUM' %}warn{% else %}ok{% endif %}"
+                   {% if r.risk.reasons %}title="{{ r.risk.reasons|join:', ' }}"{% endif %}>{{ r.risk.level|title }}</span></td>
+          <td style="text-align:right"><strong>{{ r.health }}</strong></td>
+        </tr>
+      {% endfor %}
+      </tbody></table></div>
+    {% else %}<div class="empty" style="padding:24px"><p>No projects in this range.</p></div>{% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-h"><h3>Top contributors</h3>
+      <a href="{% url 'analytics:employees' %}?{{ querystring }}" class="card-link">All employees</a></div>
+    {% if top_employees %}
+    <div class="table-wrap"><table>
+      <thead><tr><th>Person</th><th>Hours</th><th>Billable</th><th style="text-align:right">Utilisation</th></tr></thead>
+      <tbody>
+      {% for r in top_employees %}
+        <tr>
+          <td>{% employee_filter_url r.user querystring as person_url %}
+            <a href="{{ person_url }}">
+              <strong>{{ r.user.get_full_name|default:r.user.username }}</strong></a><br>
+            <span class="cell-sub">{{ r.department.name|default:"—" }}</span></td>
+          <td>{{ r.total_hours|floatformat:"-2" }}</td>
+          <td>{{ r.billable_percent|floatformat:"0" }}%</td>
+          <td style="text-align:right">{{ r.utilization_percent|floatformat:"0" }}%</td>
+        </tr>
+      {% endfor %}
+      </tbody></table></div>
+    {% else %}<div class="empty" style="padding:24px"><p>No work logged in this range.</p></div>{% endif %}
+  </div>
+</div>
+{% endblock %}

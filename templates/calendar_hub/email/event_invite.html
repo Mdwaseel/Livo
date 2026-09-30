@@ -1,0 +1,115 @@
+{% comment %}
+Table layout and inline styles, matching projects/email/task_assigned.html: mail
+clients strip <style> blocks and have no flexbox, so anything smarter than this
+renders as a broken stack in Outlook.
+
+One template for all three moments. The invitation, the change and the
+cancellation differ in their headline, their opening sentence and one accent
+colour — everything below that is the same set of facts, and forking the file
+three ways would mean fixing every future detail three times.
+{% endcomment %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#131715;padding:32px 12px;font-family:Segoe UI,Helvetica,Arial,sans-serif">
+  <tr><td align="center">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#1b201e;border:1px solid #2e3833;border-radius:14px">
+      <tr><td style="padding:30px 32px 8px">
+        <div style="font-size:13px;letter-spacing:.18em;text-transform:uppercase;color:#17e381;font-weight:700">Livo OS</div>
+        <h1 style="margin:14px 0 6px;font-size:20px;color:#ffffff;font-weight:700">{{ headline }}</h1>
+        <p style="margin:0;color:#a6aca9;font-size:14px;line-height:1.6">
+          Hi {{ person.get_full_name|default:person.username }},
+          {% if change == "cancelled" %}
+            {% if actor %}{{ actor.get_full_name|default:actor.username }} cancelled{% else %}we've cancelled{% endif %}
+            the {{ event.get_kind_display|lower }} below. Nothing is expected of you — it's off.
+          {% elif change == "updated" %}
+            {% if actor %}{{ actor.get_full_name|default:actor.username }} changed{% else %}there's a change to{% endif %}
+            a {{ event.get_kind_display|lower }} you're on. The details below are the current ones.
+          {% else %}
+            {% if actor %}{{ actor.get_full_name|default:actor.username }} invited you to{% else %}you've been invited to{% endif %}
+            the {{ event.get_kind_display|lower }} below.
+          {% endif %}
+        </p>
+      </td></tr>
+
+      <tr><td style="padding:22px 32px 6px">
+        <div style="background:#131715;border:1px solid {% if change == 'cancelled' %}#5c2b2b{% else %}#36403b{% endif %};border-radius:10px;padding:18px 20px">
+          <div style="font-size:17px;color:#ffffff;font-weight:700;line-height:1.4{% if change == 'cancelled' %};text-decoration:line-through{% endif %}">{{ event.title }}</div>
+          <div style="margin-top:6px;color:#17e381;font-size:13px;font-weight:600">{{ when }}</div>
+          {% if event.is_recurring %}
+          <div style="margin-top:3px;color:#848a87;font-size:12.5px">{{ event.recurrence_label }}</div>
+          {% endif %}
+          {% if event.description %}
+          <p style="margin:11px 0 0;color:#a6aca9;font-size:13px;line-height:1.6">{{ event.description|truncatechars:320 }}</p>
+          {% endif %}
+        </div>
+      </td></tr>
+
+      <tr><td style="padding:14px 32px 6px">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:12.5px;color:#848a87">
+          {% if event.location %}
+          <tr>
+            <td style="padding:4px 0;vertical-align:top">Where</td>
+            <td align="right" style="color:#cbcfcd">{{ event.location }}</td>
+          </tr>
+          {% endif %}
+          {% if event.meeting_url %}
+          <tr>
+            <td style="padding:4px 0">Video call</td>
+            <td align="right"><a href="{{ event.meeting_url }}" style="color:#17e381;text-decoration:none;font-weight:600">Join the call</a></td>
+          </tr>
+          {% endif %}
+          {% if project %}
+          <tr>
+            <td style="padding:4px 0;vertical-align:top">Project</td>
+            <td align="right" style="color:#cbcfcd">{{ project.name }}{% if client %} &middot; {{ client.name }}{% endif %}</td>
+          </tr>
+          {% elif client %}
+          <tr>
+            <td style="padding:4px 0">Client</td>
+            <td align="right" style="color:#cbcfcd">{{ client.name }}</td>
+          </tr>
+          {% endif %}
+          {% if department %}
+          <tr>
+            <td style="padding:4px 0">Team</td>
+            <td align="right" style="color:#cbcfcd">{{ department.name }}</td>
+          </tr>
+          {% endif %}
+          {% if organiser %}
+          <tr>
+            <td style="padding:4px 0">Organiser</td>
+            <td align="right" style="color:#cbcfcd">{{ organiser.get_full_name|default:organiser.username }}</td>
+          </tr>
+          {% endif %}
+          {% if attendees %}
+          <tr>
+            <td style="padding:4px 0;vertical-align:top">Attendees</td>
+            <td align="right" style="color:#cbcfcd;line-height:1.6">{% for guest in attendees %}{{ guest.get_full_name|default:guest.username }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
+          </tr>
+          {% endif %}
+          {% if event.reminder_minutes is not None %}
+          <tr>
+            <td style="padding:4px 0">Reminder</td>
+            <td align="right" style="color:#cbcfcd">{{ event.reminder_minutes }} minutes before</td>
+          </tr>
+          {% endif %}
+        </table>
+      </td></tr>
+
+      {% if url %}
+      <tr><td style="padding:20px 32px 8px">
+        <a href="{{ url }}" style="display:inline-block;background:{% if change == 'cancelled' %}#848a87{% else %}#17e381{% endif %};color:#131715;font-size:13.5px;font-weight:700;text-decoration:none;padding:11px 22px;border-radius:9px">See the full details</a>
+      </td></tr>
+      {% endif %}
+
+      <tr><td style="padding:8px 32px 28px;color:#626764;font-size:11.5px;line-height:1.6">
+        {% if change == "cancelled" %}
+          The attached calendar file removes this from your calendar.
+        {% else %}
+          The attached calendar file adds this to Google Calendar, Outlook or Apple Calendar.
+        {% endif %}
+      </td></tr>
+    </table>
+    <div style="max-width:520px;margin-top:14px;color:#626764;font-size:11.5px">
+      Sent automatically by Livo OS. Please don't reply to this address.
+    </div>
+  </td></tr>
+</table>

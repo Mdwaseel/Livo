@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block crumb %}<a href="{% url 'core:settings' %}">Agency settings</a> / Roles &amp; permissions{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h2>Roles &amp; permissions</h2>
+    <p>Each role is a matrix of module × action permissions. Users get the union of their primary + extra roles.</p></div>
+</div>
+<div class="grid-2">
+  <div class="card">
+    <div class="card-h"><h3>Roles</h3></div>
+    {% if roles %}
+    <div class="table-wrap"><table><thead><tr><th>Role</th><th>Users</th><th>Modules</th><th></th></tr></thead><tbody>
+      {% for r in roles %}
+      <tr>
+        <td><a href="{% url 'accounts:role_matrix' r.pk %}"><strong>{{ r.name }}</strong></a>
+          {% if r.is_system %} <span class="tag gray">system</span>{% endif %}
+          {% if r.description %}<div style="color:var(--ink-soft);font-size:12px">{{ r.description|truncatechars:80 }}</div>{% endif %}</td>
+        <td><span class="tag gray">{{ r.user_count }}</span></td>
+        <td><span class="tag gray">{{ r.module_count }}</span></td>
+        <td class="row-actions">
+          <a href="{% url 'accounts:role_matrix' r.pk %}">Edit matrix</a>
+          {% if not r.is_system %}
+          <form method="post" action="{% url 'accounts:role_delete' r.pk %}" style="display:inline"
+                onsubmit="return confirm('Delete role “{{ r.name|escapejs }}”?')">
+            {% csrf_token %}<button type="submit" class="link-danger">Delete</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody></table></div>
+    {% else %}
+    <div class="empty"><h3>No roles yet</h3><p>Run <code>python manage.py seed_rbac</code> or add one here.</p></div>
+    {% endif %}
+  </div>
+  <div style="align-self:start">
+    <div class="card">
+      <div class="card-h"><h3>New role</h3></div>
+      <div class="card-b">
+        <form method="post" action="{% url 'accounts:role_create' %}">
+          {% csrf_token %}
+          <div class="field"><label>Name *</label><input name="name" required placeholder="e.g. Support"></div>
+          <div class="field"><label>Description</label><textarea name="description" placeholder="What this role is for…"></textarea></div>
+          <button class="btn" type="submit">Create role</button>
+        </form>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <div class="card-h"><h3>Related</h3></div>
+      <div class="card-b" style="display:flex;flex-direction:column;gap:8px;font-size:13px">
+        <a href="{% url 'accounts:user_list' %}">Team — assign roles to people →</a>
+        <a href="{% url 'accounts:department_list' %}">Departments →</a>
+        <a href="{% url 'accounts:designation_list' %}">Designations →</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

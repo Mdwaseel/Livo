@@ -1,0 +1,77 @@
+{% comment %}
+Client-facing, light, table layout and inline styles only (mail clients strip
+<style> and have no flexbox). Built to be skimmed on a phone: what changed,
+grouped, with the date the client cares about in bold.
+{% endcomment %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f5f4;padding:28px 12px;font-family:Segoe UI,Helvetica,Arial,sans-serif">
+  <tr><td align="center">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px">
+      <tr><td style="padding:0 4px 14px;font-size:14px;font-weight:700;color:#141a17">{{ agency_name }}</td></tr>
+    </table>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #e0e3e2;border-radius:16px">
+      <tr><td style="padding:28px 28px 4px">
+        <div style="display:inline-block;padding:5px 11px;border-radius:999px;background:#dff5ea;color:#00614a;font-size:12px;font-weight:700">
+          {% if summary %}Your {{ frequency_label }}{% else %}Calendar update{% endif %}
+        </div>
+        <h1 style="margin:14px 0 8px;font-size:22px;line-height:1.3;color:#141a17;font-weight:800">{{ count }} change{{ count|pluralize }} to your calendar</h1>
+        <p style="margin:0;color:#4c5450;font-size:15px;line-height:1.6">Hi {{ reviewer.first_name }}, here's what's new on your content calendar for {{ client.name }}.</p>
+      </td></tr>
+
+      {% if waiting %}
+      <tr><td style="padding:18px 28px 0">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fdf0d6;border-radius:12px">
+          <tr>
+            <td style="padding:13px 16px;color:#6b4100;font-size:14px;line-height:1.5"><strong>{{ waiting }} item{{ waiting|pluralize:" is,s are" }} waiting for your approval.</strong></td>
+            {% if approvals_url %}<td align="right" style="padding:13px 16px;white-space:nowrap"><a href="{{ approvals_url }}" style="color:#6b4100;font-size:14px;font-weight:700">Review &rarr;</a></td>{% endif %}
+          </tr>
+        </table>
+      </td></tr>
+      {% endif %}
+
+      {% for section in sections %}
+      <tr><td style="padding:22px 28px 0">
+        <div style="margin:0 0 8px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:{% if section.kind == 'DONE' %}#11794a{% elif section.kind == 'REMOVED' or section.kind == 'POSTPONED' %}#6e7672{% else %}#00614a{% endif %}">{{ section.label }}</div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #ebedec">
+          {% for item in section.items %}
+          <tr><td style="padding:12px 0;border-bottom:1px solid #ebedec">
+            <div style="font-size:15px;font-weight:700;line-height:1.4;color:{% if section.kind == 'REMOVED' %}#6e7672{% else %}#141a17{% endif %}">{{ item.title }}</div>
+            <div style="margin-top:3px;font-size:13px;line-height:1.5;color:#6e7672">
+              {{ item.kind_label }}{% if item.platform_label %} &middot; {{ item.platform_label }}{% endif %} &middot;
+              {% if section.kind == 'MOVED' %}<span style="text-decoration:line-through">{{ item.old_date|date:"D j M" }}{% if item.old_time %}, {{ item.old_time|time:"g:i A" }}{% endif %}</span> &rarr; <strong style="color:#141a17">{{ item.date|date:"D j M" }}{% if item.time %}, {{ item.time|time:"g:i A" }}{% endif %}</strong>
+              {% else %}<strong style="color:{% if section.kind == 'REMOVED' %}#6e7672{% else %}#141a17{% endif %}">{{ item.date|date:"D j M" }}{% if item.time %}, {{ item.time|time:"g:i A" }}{% endif %}</strong>{% endif %}
+            </div>
+            {% if item.link %}<div style="margin-top:6px"><a href="{{ item.link }}" style="color:#00614a;font-size:13.5px;font-weight:700">View it &rarr;</a></div>{% endif %}
+          </td></tr>
+          {% endfor %}
+        </table>
+      </td></tr>
+      {% endfor %}
+
+      {% if coming_up %}
+      <tr><td style="padding:22px 28px 0">
+        <div style="margin:0 0 8px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4c5450">Coming up this week</div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9f8;border:1px solid #ebedec;border-radius:12px">
+          {% for activity in coming_up %}
+          <tr>
+            <td style="padding:9px 14px;font-size:13px;color:#6e7672;white-space:nowrap;vertical-align:top">{{ activity.date|date:"D j M" }}</td>
+            <td style="padding:9px 14px 9px 0;font-size:14px;color:#141a17;line-height:1.4">{{ activity.title }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </td></tr>
+      {% endif %}
+
+      {% if calendar_url %}
+      <tr><td style="padding:24px 28px 6px">
+        <a href="{{ calendar_url }}" style="display:inline-block;background:#00795b;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;padding:13px 24px;border-radius:10px">Open your calendar</a>
+      </td></tr>
+      {% endif %}
+      <tr><td style="padding:14px 28px 26px">
+        <p style="margin:0;color:#8f9592;font-size:12.5px;line-height:1.6">
+          You're getting these because {{ agency_name }} added {{ reviewer.email }} to the calendar updates for {{ client.name }}.
+          {% if prefs_url %}<a href="{{ prefs_url }}" style="color:#4c5450">Change how often, or unsubscribe</a>.{% endif %}
+        </p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>

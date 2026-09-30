@@ -1,0 +1,425 @@
+{% extends "base.html" %}
+{% block crumb %}<a href="{{ document.project.get_absolute_url }}">{{ document.project.name }}</a> / {{ document.title }}{% endblock %}
+{% block content %}
+{% if document.is_archived %}
+<div class="banner">
+  <span>This document is archived — it's hidden from lists but nothing was deleted.</span>
+  {% if can.approve %}
+  <form method="post" action="{% url 'documents:unarchive' document.pk %}">{% csrf_token %}
+    <button class="btn sm warn" type="submit">Restore document</button></form>
+  {% endif %}
+</div>
+{% endif %}
+<div class="page-head">
+  <div><h2>{{ document.title }}</h2>
+    <p>{{ document.document_type.name }} · {{ document.project.client.name }}
+      {% if document.number %} · <span style="font-family:var(--mono)">{{ document.number }}</span>{% endif %}
+      {% if document.current_version %} · v{{ document.current_version.version_number }}{% endif %}
+      {% if pricing %} · <strong>{{ pricing.totals.grand_total_display }}</strong>{% endif %}
+      · <span class="tag {% if document.status == 'APPROVED' %}ok{% elif document.status == 'SENT' %}ok{% elif document.status == 'REVIEW' %}warn{% else %}gray{% endif %}">{{ document.get_status_display }}</span></p></div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end">
+    {% for action in status_actions %}
+      <form method="post" action="{% url 'documents:set_status' document.pk %}" class="status-action">{% csrf_token %}
+        <input type="hidden" name="status" value="{{ action.value }}">
+        {% if action.value == 'REVIEW' %}
+          {% comment %}
+          The review deadline is captured on the move into review, where it is
+          actually known. It shows on the team calendar; approving or sending
+          the document clears it.
+          {% endcomment %}
+          <label class="inline-date">Review by
+            <input type="date" name="review_due_date" value="{{ document.review_due_date|date:'Y-m-d' }}"></label>
+        {% endif %}
+        <button class="btn {% if action.value == 'DRAFT' %}ghost{% endif %}" type="submit">{{ action.label }}</button></form>
+    {% endfor %}
+    <form method="post" action="{% url 'documents:regenerate' document.pk %}"
+      {% if pricing %}onsubmit="return confirm('Redraft from the brief? Every line item you have edited will be replaced by a fresh AI draft.')"{% endif %}>{% csrf_token %}
+      <button class="btn ghost" type="submit">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        {% if pricing %}Redraft{% else %}Regenerate{% endif %}</button></form>
+    {% if pricing %}
+    <button class="btn ghost" type="submit" form="itemsForm">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+      Save {{ document.document_type.name|lower }}</button>
+    {% else %}
+    <button class="btn ghost" onclick="saveDoc()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+      Save version</button>
+    {% endif %}
+    <form method="post" action="{% url 'documents:export_pdf' document.pk %}">{% csrf_token %}
+      <button class="btn" type="submit">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export PDF</button></form>
+    <details class="menu">
+      <summary class="btn ghost" title="More actions" aria-label="More actions">⋯</summary>
+      <div class="pop" style="width:230px">
+        {% if versions|length > 1 %}
+        <a href="{% url 'documents:compare' document.pk %}">Compare versions</a>
+        {% endif %}
+        {% if can.documents %}
+        <form method="post" action="{% url 'documents:duplicate' document.pk %}">{% csrf_token %}
+          <a href="#" onclick="this.parentNode.submit();return false">Duplicate document</a></form>
+        {% endif %}
+        {% if can.approve and not document.is_archived %}
+        <form method="post" action="{% url 'documents:archive' document.pk %}">{% csrf_token %}
+          <a href="#" style="color:var(--danger)" onclick="this.parentNode.submit();return false">Archive document</a></form>
+        {% endif %}
+        {% if can.approve %}
+        <form method="post" action="{% url 'documents:delete' document.pk %}">
+          {% csrf_token %}
+          <a href="#" style="color:var(--danger)" onclick="if(confirm('Permanently delete “{{ document.title|escapejs }}”? All versions and exported files go with it. This cannot be undone.'))this.parentNode.submit();return false">Delete permanently</a></form>
+        {% endif %}
+      </div>
+    </details>
+  </div>
+</div>
+<div class="grid-2">
+  <div>
+  {% if pricing %}
+    {% comment %}
+    A priced document is edited as data, not as prose: these rows ARE the
+    invoice, and the exported body is re-rendered from them on every save. That
+    is why there is no rich-text editor here — free-typed HTML and a totals
+    line that has to agree with it is exactly the drift this replaces.
+    {% endcomment %}
+    <form method="post" action="{% url 'documents:save_items' document.pk %}" id="itemsForm">
+      {% csrf_token %}
+      <div class="card">
+        <div class="card-h"><h3>Line items</h3>
+          <span style="font-size:12px;color:var(--ink-soft)">Totals are computed on save — the AI never adds up</span></div>
+        <div class="card-b">
+          <div class="items-scroll">
+            <table class="items" id="itemsTable">
+              <thead><tr>
+                <th style="width:38%">Description</th>
+                <th style="width:9%">Qty</th>
+                <th style="width:11%">Unit</th>
+                <th style="width:17%">Rate ({{ pricing.symbol }})</th>
+                <th style="width:10%">GST %</th>
+                <th style="width:15%;text-align:right">Amount</th>
+                <th style="width:34px"></th>
+              </tr></thead>
+              <tbody>
+              {% for item in pricing.items %}
+                <tr>
+                  <td><input name="item_description" value="{{ item.description }}" maxlength="300" placeholder="What is being billed"></td>
+                  <td><input name="item_quantity" value="{{ item.qty_display }}" inputmode="decimal" class="num"></td>
+                  <td><input name="item_unit" value="{{ item.unit }}" maxlength="20" placeholder="hrs"></td>
+                  <td><input name="item_unit_price" value="{{ item.unit_price }}" inputmode="decimal" class="num"></td>
+                  <td><input name="item_tax_rate" value="{{ item.rate_display }}" inputmode="decimal" class="num"></td>
+                  <td class="amount">{{ item.amount_display }}</td>
+                  <td><button type="button" class="rowdel" title="Delete this line" aria-label="Delete this line">×</button></td>
+                </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% if not pricing.items %}
+          <p class="hint" id="emptyNote" style="margin:10px 0 0">No line items yet — add one below, or use
+            <strong>Redraft</strong> to have the brief read again.</p>
+          {% endif %}
+          <div style="display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap">
+            <button type="button" class="btn ghost sm" id="addRow">+ Add line</button>
+            <span class="hint" style="margin:0">A negative rate makes a discount line.</span>
+          </div>
+
+          <div class="totals">
+            <div class="trow"><span>Subtotal</span><span id="tSubtotal">{{ pricing.totals.subtotal_display }}</span></div>
+            <div id="tTaxRows">
+              {% for row in pricing.totals.tax_rows %}
+              <div class="trow"><span>{{ row.label }}</span><span>{{ row.amount_display }}</span></div>
+              {% endfor %}
+            </div>
+            <div class="trow grand"><span>Total</span><span id="tGrand">{{ pricing.totals.grand_total_display }}</span></div>
+            {% if pricing.totals.in_words %}
+            <div class="inwords" id="tWords">{{ pricing.totals.in_words }}</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:18px">
+        <div class="card-h"><h3>{{ document.document_type.name }} details</h3></div>
+        <div class="card-b">
+          <div class="taxbox">
+            <label class="taxtoggle">
+              <input type="checkbox" name="charge_gst" id="chargeGst"
+                     {% if pricing.charge_gst %}checked{% endif %}>
+              <span><strong>Charge GST on this {{ document.document_type.name|lower }}</strong>
+                <span class="hint" style="margin:0;display:block">Untick for an export, SEZ or
+                  exempt supply. The rates stay on the rows, so ticking it back on restores
+                  the same figures.</span></span></label>
+            <div class="field" id="gstModeField" style="margin:12px 0 0">
+              <label>How the GST is split</label>
+              <select name="gst_mode" id="gstMode">
+                {% for value, label in pricing.gst_mode_choices %}
+                <option value="{{ value }}" {% if pricing.gst_mode == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+              <div class="hint">
+                {% if pricing.agency_state and pricing.client_state %}
+                  Automatic reads {{ pricing.agency_state }} → {{ pricing.client_state }}, so it
+                  charges <strong>{% if pricing.gst_kind == "split" %}CGST + SGST{% elif pricing.gst_kind == "igst" %}IGST{% else %}a single GST line{% endif %}</strong>.
+                {% else %}
+                  Automatic needs both states to decide. {% if not pricing.agency_state %}Set the
+                  agency's state in <a href="{% url 'core:settings' %}">Agency settings</a>{% endif %}{% if not pricing.agency_state and not pricing.client_state %} and {% endif %}{% if not pricing.client_state %}the client's state on their profile{% endif %} —
+                  until then it charges one combined GST line.
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-top:16px">
+            <div class="field" style="margin:0"><label>Date</label>
+              <input type="date" name="issue_date" value="{{ pricing.issue_date|date:'Y-m-d' }}"></div>
+            <div class="field" style="margin:0"><label>Payment due by</label>
+              <input type="date" name="due_date" value="{{ pricing.due_date|date:'Y-m-d' }}"></div>
+            <div class="field" style="margin:0"><label>PO / reference</label>
+              <input name="po_number" value="{{ pricing.po_number }}" maxlength="60"></div>
+          </div>
+          <div class="field" style="margin:14px 0 0"><label>Payment terms &amp; notes</label>
+            <textarea name="notes" rows="3" maxlength="4000"
+              placeholder="e.g. 50% advance, balance within 15 days. Bank details…">{{ pricing.notes }}</textarea>
+            <div class="hint">Printed under the totals on the exported document.</div></div>
+          <div style="margin-top:14px"><button class="btn" type="submit">Save {{ document.document_type.name|lower }}</button></div>
+        </div>
+      </div>
+    </form>
+
+    <details class="card" style="margin-top:18px" {% if not pricing.items %}open{% endif %}>
+      <summary class="card-h" style="cursor:pointer;list-style:none"><h3>Preview of the exported document</h3></summary>
+      <div class="card-b"><div class="doc-preview">{{ document.current_version.content_html|safe }}</div></div>
+    </details>
+  {% else %}
+    <div class="card">
+      <div class="card-h"><h3>Content</h3>
+        <span id="save-state" class="savebar"><span class="pulse"></span><span id="save-text">Autosave on · edit freely</span></span></div>
+      <div class="card-b">
+        <div id="editor" style="min-height:420px">{{ document.current_version.content_html|safe }}</div>
+        <form id="saveForm" method="post" action="{% url 'documents:save' document.pk %}" style="display:none">
+          {% csrf_token %}<input type="hidden" name="content_html" id="content_html"></form>
+      </div>
+    </div>
+  {% endif %}
+  </div>
+  <div>
+    <div class="card">
+      <div class="card-h"><h3>Version history</h3>
+        {% if versions|length > 1 %}
+        <a href="{% url 'documents:compare' document.pk %}" style="font-size:12px;font-weight:600;color:var(--primary)">Compare</a>
+        {% endif %}</div>
+      <div class="card-b" style="padding:6px 20px">
+      {% for v in versions %}
+        <div class="vrow">
+          <div><strong>v{{ v.version_number }}</strong>
+            {% if v == document.current_version %}<span class="tag" style="margin-left:6px">current</span>{% endif %}
+            <br><span style="color:var(--ink-soft);font-size:12px">{{ v.note }} · {{ v.created_at|date:"d M, H:i" }}</span></div>
+          {% if v != document.current_version and can.documents %}
+          <form method="post" action="{% url 'documents:restore_version' document.pk v.version_number %}">{% csrf_token %}
+            <button class="btn ghost sm" type="submit" title="Make this the current version">Restore</button></form>
+          {% endif %}
+        </div>
+      {% endfor %}
+      </div>
+    </div>
+    <div class="card" style="margin-top:18px">
+      <div class="card-h"><h3>Exported files</h3></div>
+      {% if files %}
+      <table><tbody>
+      {% for f in files %}
+        <tr><td><a href="{{ f.file.url }}" style="color:var(--primary);font-weight:600">{{ f.file.name|cut:"generated/" }}</a>
+          <br><span style="color:var(--ink-soft);font-size:12px">v{{ f.version.version_number }} · {{ f.created_at|date:"d M, H:i" }}</span></td></tr>
+      {% endfor %}</tbody></table>
+      {% else %}
+      <div class="empty" style="padding:22px"><p style="font-size:12.5px">No exports yet — use “Export PDF”.</p></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% if pricing %}
+<style>
+  .items-scroll{overflow-x:auto}
+  table.items{width:100%;border-collapse:collapse;min-width:640px}
+  table.items th{text-align:left;font-size:11px;font-weight:700;letter-spacing:.4px;
+    text-transform:uppercase;color:var(--ink-soft);padding:0 6px 7px;border-bottom:1px solid var(--line)}
+  table.items td{padding:4px 6px 4px 0;vertical-align:middle;border:none}
+  table.items td:last-child{padding-right:0}
+  table.items input{width:100%;padding:7px 9px;font-size:13px}
+  table.items input.num{text-align:right;font-family:var(--mono)}
+  table.items td.amount{text-align:right;font-family:var(--mono);font-size:13px;
+    font-weight:600;white-space:nowrap;padding-right:8px}
+  .rowdel{width:26px;height:26px;border-radius:6px;border:1px solid var(--line);
+    background:transparent;color:var(--ink-soft);font-size:16px;line-height:1;cursor:pointer}
+  .rowdel:hover{border-color:var(--danger);color:var(--danger)}
+  .totals{margin-top:16px;margin-left:auto;max-width:340px;border-top:1px solid var(--line);padding-top:10px}
+  .totals .trow{display:flex;justify-content:space-between;gap:16px;font-size:13px;padding:3px 0;
+    color:var(--ink-soft)}
+  .totals .trow span:last-child{font-family:var(--mono);color:var(--ink)}
+  .totals .trow.grand{font-size:15px;font-weight:700;color:var(--ink);
+    border-top:1px solid var(--line);margin-top:6px;padding-top:9px}
+  .totals .inwords{font-size:11.5px;color:var(--ink-soft);margin-top:8px;text-align:right;line-height:1.5}
+  .taxbox{border:1px solid var(--line);border-radius:10px;padding:14px 16px;background:var(--surface-2,transparent)}
+  .taxtoggle{display:flex;gap:10px;align-items:flex-start;cursor:pointer;font-size:13px}
+  .taxtoggle input{width:auto;margin-top:2px;flex:none}
+  .taxbox.off #gstModeField{opacity:.45;pointer-events:none}
+  .doc-preview{background:#fff;border:1px solid var(--line);border-radius:8px;padding:26px;
+    overflow-x:auto;font-size:13px}
+  .doc-preview table{max-width:100%}
+</style>
+<script>
+(() => {
+  const CODE = "{{ pricing.currency|escapejs }}", SYMBOL = "{{ pricing.symbol|escapejs }}";
+  const body = document.querySelector('#itemsTable tbody');
+  const addRow = document.getElementById('addRow');
+  const emptyNote = document.getElementById('emptyNote');
+
+  // Mirrors documents.pricing.format_amount so the live figures and the saved
+  // ones read identically. The server stays authoritative: this is a preview.
+  const fmt = value => {
+    const negative = value < 0;
+    const [whole, frac] = Math.abs(value).toFixed(2).split('.');
+    let grouped;
+    if (CODE === 'INR' && whole.length > 3)
+      grouped = whole.slice(0, -3).replace(/\B(?=(\d\d)+$)/g, ',') + ',' + whole.slice(-3);
+    else
+      grouped = whole.replace(/\B(?=(\d{3})+$)/g, ',');
+    return (negative ? '-' : '') + SYMBOL + grouped + '.' + frac;
+  };
+  const round2 = n => Math.round((n + Number.EPSILON) * 100) / 100;
+  const read = input => {
+    const n = parseFloat((input.value || '').replace(/[^\d.\-]/g, ''));
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  // "auto" resolves server-side from the two states; the other modes are
+  // explicit, so the select maps straight onto a shape.
+  const AUTO_KIND = "{{ pricing.gst_kind|escapejs }}";
+  const chargeGst = document.getElementById('chargeGst');
+  const gstMode = document.getElementById('gstMode');
+  const taxbox = document.querySelector('.taxbox');
+  const resolvedKind = () => ({cgst_sgst: 'split', igst: 'igst', single: 'gst'}[gstMode.value]
+                              || AUTO_KIND);
+
+  // Mirrors pricing._tax_rows: the halves come out of the tax charged, not out
+  // of a second multiplication, so CGST + SGST always adds back to the GST.
+  function taxRows(rate, tax, kind) {
+    if (kind === 'split') {
+      const cgst = round2(tax / 2);
+      return [[`CGST @ ${rate / 2}%`, cgst], [`SGST @ ${rate / 2}%`, round2(tax - cgst)]];
+    }
+    return [[`${kind === 'igst' ? 'IGST' : 'GST'} @ ${rate}%`, tax]];
+  }
+
+  function recalc() {
+    let subtotal = 0;
+    const byRate = new Map();
+    body.querySelectorAll('tr').forEach(row => {
+      const qty = read(row.querySelector('[name=item_quantity]'));
+      const price = read(row.querySelector('[name=item_unit_price]'));
+      const rate = read(row.querySelector('[name=item_tax_rate]'));
+      const amount = round2(qty * price);
+      row.querySelector('.amount').textContent = fmt(amount);
+      subtotal = round2(subtotal + amount);
+      const bucket = byRate.get(rate) || 0;
+      byRate.set(rate, round2(bucket + round2(amount * rate / 100)));
+    });
+    const charging = chargeGst.checked;
+    const rates = charging ? [...byRate.entries()].sort((a, b) => a[0] - b[0]) : [];
+    const kind = charging ? resolvedKind() : 'gst';
+    document.getElementById('tTaxRows').innerHTML = rates
+      .flatMap(([rate, tax]) => taxRows(rate, tax, kind))
+      .map(([label, value]) => `<div class="trow"><span>${label}</span><span>${fmt(value)}</span></div>`)
+      .join('') || (charging ? '' : '<div class="trow"><span>GST</span><span>not charged</span></div>');
+    const taxTotal = rates.reduce((sum, [, tax]) => round2(sum + tax), 0);
+    document.getElementById('tSubtotal').textContent = fmt(subtotal);
+    document.getElementById('tGrand').textContent = fmt(round2(subtotal + taxTotal));
+    // The words line is generated server-side; blank it rather than show a stale one.
+    const words = document.getElementById('tWords');
+    if (words) words.textContent = 'Amount in words is set when you save.';
+    if (emptyNote) emptyNote.style.display = body.children.length ? 'none' : '';
+  }
+
+  function newRow() {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td><input name="item_description" maxlength="300" placeholder="What is being billed"></td>
+      <td><input name="item_quantity" value="1" inputmode="decimal" class="num"></td>
+      <td><input name="item_unit" maxlength="20" placeholder="hrs"></td>
+      <td><input name="item_unit_price" value="0" inputmode="decimal" class="num"></td>
+      <td><input name="item_tax_rate" value="18" inputmode="decimal" class="num"></td>
+      <td class="amount">${fmt(0)}</td>
+      <td><button type="button" class="rowdel" title="Delete this line" aria-label="Delete this line">×</button></td>`;
+    body.appendChild(row);
+    row.querySelector('input').focus();
+    recalc();
+  }
+
+  addRow.addEventListener('click', newRow);
+  // Deleting is removing the row: the save posts the table as it now stands,
+  // so an absent row is a deleted row with no separate endpoint to go wrong.
+  body.addEventListener('click', e => {
+    if (!e.target.classList.contains('rowdel')) return;
+    e.target.closest('tr').remove();
+    recalc();
+  });
+  body.addEventListener('input', recalc);
+  chargeGst.addEventListener('change', () => {
+    taxbox.classList.toggle('off', !chargeGst.checked);
+    recalc();
+  });
+  gstMode.addEventListener('change', recalc);
+  taxbox.classList.toggle('off', !chargeGst.checked);
+  // Enter in a cell should add the next line, not submit a half-typed invoice.
+  body.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); newRow(); }
+  });
+
+  recalc();
+})();
+</script>
+{% else %}
+<!-- Quill rich text editor -->
+<link href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js"></script>
+<script>
+  const quill = new Quill('#editor', {
+    theme: 'snow',
+    modules: { toolbar: [
+      [{header:[1,2,3,false]}],['bold','italic','underline'],
+      [{list:'ordered'},{list:'bullet'}],['link'],['clean']
+    ]}
+  });
+  function saveDoc(){
+    document.getElementById('content_html').value = quill.root.innerHTML;
+    document.getElementById('saveForm').submit();
+  }
+  // --- Debounced autosave ---
+  const csrf = document.querySelector('#saveForm [name=csrfmiddlewaretoken]').value;
+  const saveState = document.getElementById('save-state');
+  const saveText = document.getElementById('save-text');
+  function setSave(cls, text){ saveState.className = 'savebar ' + cls; saveText.textContent = text; }
+  let autosaveTimer = null;
+  quill.on('text-change', (delta, oldDelta, source) => {
+    if (source !== 'user') return;
+    setSave('', 'Unsaved changes…');
+    clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(autosave, 2000);
+  });
+  async function autosave(){
+    setSave('saving', 'Saving…');
+    try {
+      const body = new FormData();
+      body.append('content_html', quill.root.innerHTML);
+      const r = await fetch("{% url 'documents:autosave' document.pk %}", {
+        method: 'POST', body, headers: {'X-CSRFToken': csrf},
+      });
+      const data = await r.json();
+      if (data.ok) { setSave('saved', `Saved · ${data.saved_at}`); }
+      else { setSave('error', 'Save failed'); }
+    } catch (e) {
+      setSave('error', 'Save failed — check connection');
+    }
+  }
+</script>
+{% endif %}
+{% endblock %}

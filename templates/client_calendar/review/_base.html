@@ -1,0 +1,48 @@
+{% load static client_calendar_tags %}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+{% comment %}
+One reviewer's private page: never indexed, and the token never leaves in a Referer to
+another site. same-origin rather than no-referrer so this page's own forms pass CSRF.
+{% endcomment %}
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="referrer" content="same-origin">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f5f7f6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1110" media="(prefers-color-scheme: dark)">
+<title>{% block title %}Approvals{% endblock %} · {{ agency.agency_name|default:"Livo Digital" }}</title>
+<link rel="icon" type="image/png" href="{% static 'img/favicon.png' %}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="{% static 'css/client_calendar.css' %}">
+<link rel="stylesheet" href="{% static 'css/client_review.css' %}">
+</head>
+<body class="cc-body">
+<div class="cc cc-public rv">
+  <a class="cc-skip" href="#rv-main">Skip to content</a>
+
+  <header class="cc-topbar">
+    {% if reviewer %}
+    <a class="cc-brand" href="{% url 'client_review:inbox' reviewer.token %}">
+      <img src="{% static 'img/mark.png' %}" alt="" width="30" height="30"><span>{{ agency.agency_name|default:"Livo Digital" }}</span></a>
+    {% else %}
+    <div class="cc-brand"><img src="{% static 'img/mark.png' %}" alt="" width="30" height="30"><span>{{ agency.agency_name|default:"Livo Digital" }}</span></div>
+    {% endif %}
+    {% if reviewer %}<span class="cc-private-pill">{% cc_icon "lock" %}Private to {{ reviewer.name }}</span>{% endif %}
+  </header>
+
+  <main class="cc-main rv-main" id="rv-main">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="cc-footer">
+    <p>{% if client %}Prepared for {{ client.name }} by {% endif %}<strong>{{ agency.agency_name|default:"Livo Digital" }}</strong>{% if agency.email %} · Questions? <a href="mailto:{{ agency.email }}">{{ agency.email }}</a>{% endif %}</p>
+    {% if reviewer and not prefs_only %}<p class="cc-footer-note">{% cc_icon "shield" %}Only you can open this page. Please don't forward the link. · <a href="{% url 'client_review:updates' reviewer.token %}">Email preferences</a></p>{% endif %}
+  </footer>
+</div>
+<script src="{% static 'js/client_review.js' %}" defer></script>
+</body>
+</html>

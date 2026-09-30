@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% block title %}My work logs · Livo OS{% endblock %}
+{% block crumb %}My work logs{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h2>My work logs</h2>
+    <p>Your timesheet — log time, then submit each week for approval.</p>
+  </div>
+  {% if is_approver %}
+  <a href="{% url 'worklogs:approvals' %}" class="btn ghost">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    To approve{% if pending_count %} <span class="tag info">{{ pending_count }}</span>{% endif %}</a>
+  {% endif %}
+</div>
+
+{# Month-to-date split: the number people actually get asked about. #}
+<div class="card">
+  <div class="card-h"><h3>This month</h3>
+    <span class="tag gray">{{ month_summary.entries }} entr{{ month_summary.entries|pluralize:"y,ies" }}</span></div>
+  <div class="card-b">
+    <div class="ts-totals">
+      <div class="ts-total"><div class="fin-l">Total</div>
+        <div class="ts-big">{{ month_summary.total|floatformat:"-2" }} h</div></div>
+      <div class="ts-total"><div class="fin-l">Billable</div>
+        <div class="ts-big ok">{{ month_summary.billable|floatformat:"-2" }} h</div></div>
+      <div class="ts-total"><div class="fin-l">Non-billable</div>
+        <div class="ts-big muted">{{ month_summary.non_billable|floatformat:"-2" }} h</div></div>
+      <div class="ts-total"><div class="fin-l">Approved</div>
+        <div class="ts-big">{{ month_summary.approved|floatformat:"-2" }} h</div></div>
+    </div>
+    {% if month_summary.total %}
+    <div class="split-bar" role="img"
+         aria-label="{{ month_summary.billable_percent }}% of this month's hours are billable">
+      <span class="split-billable" style="width:{{ month_summary.billable_percent }}%"></span>
+    </div>
+    <div class="split-key">
+      <span><i class="dot billable"></i> Billable {{ month_summary.billable_percent }}%</span>
+      <span><i class="dot nonbillable"></i> Non-billable</span>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{# Quick add #}
+<div class="card" style="margin-top:18px">
+  <div class="card-h"><h3>Log time</h3></div>
+  <form method="post" action="{% url 'worklogs:create' %}" class="ts-form"
+        enctype="multipart/form-data">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{% url 'worklogs:mine' %}">
+    <div class="ts-form-grid">
+      <div class="field"><label for="w-project">Project *</label>
+        <select name="project" id="w-project" required>
+          <option value="">Choose a project…</option>
+          {% for p in projects %}
+            <option value="{{ p.pk }}">{{ p.name }} · {{ p.client.name }}</option>
+          {% endfor %}
+        </select></div>
+      <div class="field"><label for="w-task">Task (optional)</label>
+        <select name="task" id="w-task">
+          <option value="">Project-level work</option>
+          {% for t in recent_tasks %}
+            <option value="{{ t.pk }}">{{ t.project.name }} — {{ t.title }}</option>
+          {% endfor %}
+        </select>
+        <p class="hint">Only tasks on the chosen project are accepted.</p></div>
+      <div class="field"><label for="w-date">Date *</label>
+        <input type="date" name="date" id="w-date" value="{{ today|date:'Y-m-d' }}" required></div>
+      <div class="field"><label for="w-cat">Category</label>
+        <select name="category" id="w-cat">
+          {% for value, label in categories %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+        </select></div>
+      <div class="field"><label for="w-start">Start</label>
+        <input type="time" name="start_time" id="w-start"></div>
+      <div class="field"><label for="w-end">End</label>
+        <input type="time" name="end_time" id="w-end"></div>
+      <div class="field"><label for="w-hours">Hours</label>
+        <input type="number" step="0.25" min="0" name="hours" id="w-hours" placeholder="e.g. 2.5">
+        <p class="hint">Leave blank to compute from start and end.</p></div>
+      <div class="field"><label for="w-shot">Screenshot</label>
+        <input type="file" name="screenshot" id="w-shot" accept="image/*"></div>
+    </div>
+    <div class="field"><label for="w-desc">What got done? *</label>
+      <input name="description" id="w-desc" required placeholder="Short summary of the work"></div>
+    <div class="ts-form-foot">
+      <label class="check-line">
+        <input type="checkbox" name="is_billable" checked>
+        <span>Billable</span>
+      </label>
+      <button class="btn" type="submit">Log time</button>
+    </div>
+  </form>
+</div>
+
+{# Weeks #}
+{% for week in weeks %}
+<div class="card" style="margin-top:18px">
+  <div class="card-h">
+    <h3>Week of {{ week.start|date:"d M" }} – {{ week.end|date:"d M Y" }}</h3>
+    <span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      <span class="tag gray">{{ week.total|floatformat:"-2" }} h</span>
+      <span class="tag ok">{{ week.billable|floatformat:"-2" }} h billable</span>
+      {% if week.non_billable %}<span class="tag">{{ week.non_billable|floatformat:"-2" }} h non-billable</span>{% endif %}
+      {% if week.awaiting %}<span class="tag info">{{ week.awaiting }} awaiting</span>{% endif %}
+    </span>
+  </div>
+
+  <div class="table-wrap">
+  <table class="ts-table">
+    <tbody>
+    {% for day in week.days %}
+      {% if day.entries %}
+      <tr class="ts-day">
+        <th colspan="5" scope="rowgroup">
+          {{ day.date|date:"D d M" }}
+          <span class="ts-day-total">{{ day.total|floatformat:"-2" }} h</span>
+        </th>
+      </tr>
+        {% for w in day.entries %}
+        <tr class="{% if w.approval_status == 'REJECTED' %}ts-rejected{% endif %}">
+          <td class="ts-what">
+            <strong>{{ w.description }}</strong>
+            <div class="ts-sub">
+              <a href="{{ w.project.get_absolute_url }}">{{ w.project.name }}</a>
+              {% if w.task %} · <a href="{{ w.task.get_absolute_url }}">{{ w.task.title }}</a>{% endif %}
+              · {{ w.get_category_display }}
+              {% if w.start_time and w.end_time %} · {{ w.start_time|time:"H:i" }}–{{ w.end_time|time:"H:i" }}{% endif %}
+            </div>
+            {% if w.review_note %}
+            <div class="ts-note">Reviewer: {{ w.review_note }}</div>
+            {% endif %}
+          </td>
+          <td class="ts-hours">{{ w.hours|floatformat:"-2" }} h</td>
+          <td class="ts-billable">
+            {% if w.is_billable %}<span class="tag ok">Billable</span>
+            {% else %}<span class="tag gray">Non-billable</span>{% endif %}</td>
+          <td class="ts-status">
+            {% if w.approval_status == 'APPROVED' %}<span class="tag ok">Approved</span>
+            {% elif w.approval_status == 'SUBMITTED' %}<span class="tag info">Awaiting approval</span>
+            {% elif w.approval_status == 'REJECTED' %}<span class="tag danger">Needs changes</span>
+            {% else %}<span class="tag gray">Draft</span>{% endif %}
+            {% if w.screenshot %}
+            <a href="{{ w.screenshot.url }}" target="_blank" rel="noopener"
+               class="ts-shot" title="View screenshot" aria-label="View screenshot">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            </a>
+            {% endif %}
+          </td>
+          <td class="ts-acts">
+            {% if not w.is_locked %}
+            <a class="link-act" href="{% url 'projects:worklog_edit' w.pk %}?next={{ request.path|urlencode }}">Edit</a>
+            {% endif %}
+            {% if w.approval_status == 'NONE' or w.approval_status == 'REJECTED' %}
+            <form method="post" action="{% url 'projects:worklog_submit' w.pk %}">{% csrf_token %}
+              <input type="hidden" name="next" value="{{ request.path }}">
+              <button class="link-act" type="submit">Submit</button></form>
+            {% endif %}
+            {% if not w.is_locked %}
+            <form method="post" action="{% url 'projects:worklog_delete' w.pk %}"
+                  onsubmit="return confirm('Delete this entry?')">{% csrf_token %}
+              <input type="hidden" name="next" value="{{ request.path }}">
+              <button class="link-act muted" type="submit">Delete</button></form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      {% endif %}
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+  <div class="ts-week-foot">
+    <div class="ts-week-sum">
+      Week total <strong>{{ week.total|floatformat:"-2" }} h</strong>
+      · {{ week.billable_percent }}% billable
+    </div>
+    {% if week.submittable %}
+    <form method="post" action="{% url 'worklogs:submit_week' %}">
+      {% csrf_token %}
+      <input type="hidden" name="week_start" value="{{ week.start|date:'Y-m-d' }}">
+      <button class="btn sm" type="submit">
+        Submit week for approval ({{ week.submittable }})</button>
+    </form>
+    {% else %}
+    <span class="ts-done">All entries submitted.</span>
+    {% endif %}
+  </div>
+</div>
+{% empty %}
+<div class="card" style="margin-top:18px"><div class="card-b">
+  <div class="empty-state">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    <p><strong>No time logged in the last eight weeks.</strong></p>
+    <p>Use the form above to log your first entry.</p>
+  </div>
+</div></div>
+{% endfor %}
+
+{% endblock %}

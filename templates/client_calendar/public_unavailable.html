@@ -1,0 +1,36 @@
+{% load static client_calendar_tags %}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="light dark">
+<title>Calendar unavailable · {{ agency.agency_name|default:"Livo Digital" }}</title>
+<link rel="icon" type="image/png" href="{% static 'img/favicon.png' %}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
+<link rel="stylesheet" href="{% static 'css/client_calendar.css' %}">
+</head>
+<body class="cc-body">
+{% comment %}
+Names nobody. Whoever holds a dead link may not be the client it was made for,
+so the page confirms nothing about whose calendar it was.
+{% endcomment %}
+<div class="cc cc-public cc-gone">
+  <main class="cc-gone-card">
+    <img src="{% static 'img/mark.png' %}" alt="" width="44" height="44">
+    <span class="cc-gone-ico">{% cc_icon "lock" %}</span>
+    {% if reason == "off" %}
+      <h1>This link is no longer active</h1>
+      <p>The calendar it pointed to has been switched off or replaced with a new link.</p>
+    {% else %}
+      <h1>We couldn't find this calendar</h1>
+      <p>The link may be incomplete — check that the whole address was copied.</p>
+    {% endif %}
+    <p>Ask your contact at {{ agency.agency_name|default:"Livo Digital" }} for a fresh link{% if agency.email %} or write to <a href="mailto:{{ agency.email }}">{{ agency.email }}</a>{% endif %}.</p>
+  </main>
+</div>
+</body>
+</html>

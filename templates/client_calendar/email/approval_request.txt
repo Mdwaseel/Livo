@@ -1,0 +1,20 @@
+{% autoescape off %}Hi {{ reviewer.first_name }},
+
+{% if reminder %}Just a nudge — this is still waiting for your go-ahead{% elif approval.version > 1 %}We've made the changes and this is ready for another look{% else %}This is ready for your review{% endif %}{% if asker %} from {{ asker.get_full_name|default:asker.username }}{% endif %} at {{ agency_name }}. Nothing goes live until you approve it.
+
+    {{ activity.title }}
+
+What:         {{ activity.get_kind_display }}{% if activity.platform %} · {{ activity.get_platform_display }}{% endif %}
+Planned for:  {{ activity.date|date:"D, j M Y" }}{% if activity.time %}, {{ activity.time|time:"g:i A" }}{% endif %}
+{% if approval.version > 1 %}Version:      {{ approval.version }}
+{% endif %}{% if approval.respond_by %}Reply by:     {{ approval.respond_by|date:"D, j M" }}
+{% endif %}{% if approval.message %}
+{{ approval.message }}
+{% endif %}{% if url %}
+Review and approve here:
+{{ url }}
+{% endif %}
+This link is only for you ({{ reviewer.email }}). The first time you open it on a device we'll email you a short code to confirm it's you, so please don't forward it.
+
+-- {{ agency_name }}
+{% endautoescape %}

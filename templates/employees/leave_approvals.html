@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block crumb %}Leave approvals{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Leave approvals</h2>
+    <p>Requests waiting on you, oldest first.</p>
+  </div>
+</div>
+
+{% comment %}
+Each row carries the requester's balance next to their request. "Three days
+left" and "already four days over" are different decisions on an identical
+request, and an approver who has to go and look that up separately will
+approve without looking.
+{% endcomment %}
+<div class="card">
+  <div class="card-h">
+    <h3>Waiting{% if rows %} · {{ rows|length }}{% endif %}</h3>
+  </div>
+  {% if rows %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Who</th><th>Dates</th><th>Type</th><th>Reason</th>
+          <th>Their balance</th><th>Decision</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td>
+            <strong>{{ row.record.user.get_full_name|default:row.record.user.username }}</strong>
+            {% if row.record.is_retrospective %}
+            <div><span class="pill pill-off">Already taken</span></div>
+            {% endif %}
+          </td>
+          <td>
+            {{ row.record.start_date|date:"d M" }}
+            {% if row.record.end_date != row.record.start_date %}
+              – {{ row.record.end_date|date:"d M" }}{% endif %}
+            <div class="hint">{{ row.days|floatformat:"-1" }} working day{{ row.days|pluralize }}</div>
+          </td>
+          <td>{{ row.record.get_kind_display }}</td>
+          <td class="hint">{{ row.record.note|default:"—" }}</td>
+          <td>
+            {% if row.balance %}
+              {% if row.balance.over %}
+                <span class="pill pill-over">{{ row.balance.over|floatformat:"-1" }} over</span>
+              {% else %}
+                <span class="pill pill-available">{{ row.balance.remaining|floatformat:"-1" }} left</span>
+              {% endif %}
+              <div class="hint">{{ row.balance.used|floatformat:"-1" }} of
+                {{ row.balance.allowed }} used</div>
+            {% else %}<span class="hint">—</span>{% endif %}
+          </td>
+          <td>
+            <form method="post" action="{% url 'employees:leave_decide' row.record.pk %}"
+                  style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+              {% csrf_token %}
+              <input name="decision_note" maxlength="200" placeholder="Note (optional)"
+                     style="min-width:150px;flex:1">
+              <button class="btn sm" type="submit" name="action" value="approve">Approve</button>
+              <button class="btn ghost sm" type="submit" name="action" value="reject">Reject</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card-b"><p class="empty">Nothing waiting on you.</p></div>
+  {% endif %}
+</div>
+
+<div class="card" style="margin-top:20px">
+  <div class="card-h"><h3>Recently decided</h3></div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr><th>Who</th><th>Dates</th><th>Type</th><th>Outcome</th><th>By</th></tr>
+      </thead>
+      <tbody>
+        {% for r in decided %}
+        <tr>
+          <td>{{ r.user.get_full_name|default:r.user.username|default:"Everyone" }}</td>
+          <td>{{ r.start_date|date:"d M" }}
+            {% if r.end_date != r.start_date %} – {{ r.end_date|date:"d M" }}{% endif %}</td>
+          <td>{{ r.get_kind_display }}</td>
+          <td>
+            {% if r.status == "APPROVED" %}<span class="pill pill-available">Approved</span>
+            {% elif r.status == "REJECTED" %}<span class="pill pill-over">Rejected</span>
+            {% else %}<span class="pill pill-off">{{ r.get_status_display }}</span>{% endif %}
+            {% if r.decision_note %}<div class="hint">{{ r.decision_note }}</div>{% endif %}
+          </td>
+          <td class="hint">{{ r.approved_by.get_full_name|default:r.approved_by.username|default:"—" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="empty">Nothing decided yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

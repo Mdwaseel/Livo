@@ -1,0 +1,12 @@
+{% autoescape off %}Hi {{ reviewer.first_name }},
+
+Your code to review work from {{ agency_name }}:
+
+    {{ code }}
+
+It expires in {{ minutes }} minutes and works once. This device will be remembered, so you won't need a code on it again for a while.
+
+Didn't ask for this? You can ignore it — nobody can open your approvals without this code.
+
+-- {{ agency_name }}
+{% endautoescape %}

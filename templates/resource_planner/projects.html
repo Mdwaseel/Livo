@@ -1,0 +1,64 @@
+{% extends "resource_planner/_base.html" %}
+
+{% block heading %}Project allocation{% endblock %}
+{% block lede %}Who is on each project, and for how many hours.{% endblock %}
+
+{% block planner %}
+{% for row in rows %}
+<div class="card" style="margin-bottom:14px">
+  <div class="card-h">
+    <h3><a href="{{ row.project.get_absolute_url }}">{{ row.project.name }}</a></h3>
+    <span style="display:flex;gap:8px;align-items:center">
+      <span class="cell-sub">{{ row.project.client.name }}</span>
+      <span class="tag {% if row.members %}gray{% else %}warn{% endif %}">{{ row.members|length }} on it</span>
+    </span>
+  </div>
+  {% if row.members %}
+  <div class="table-wrap"><table>
+    <thead><tr>
+      <th>Person</th><th>Department</th>
+      <th title="Hours logged against this project in the selected period">Logged</th>
+      <th title="Remaining estimate on their open tasks in this project">Outstanding</th>
+    </tr></thead>
+    <tbody>
+      {% for m in row.members %}
+      <tr>
+        <td><strong>{{ m.user.get_full_name|default:m.user.username }}</strong></td>
+        <td class="cell-sub">{{ m.user.department.name|default:"—" }}</td>
+        <td>{{ m.logged|floatformat:"-2" }} h</td>
+        <td>{{ m.scheduled|floatformat:"-2" }} h</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}
+  <div class="card-b">
+    <p class="hint" style="margin:0">Nobody has logged time or holds an open task
+      on this project. If it is meant to be running, it has no one on it.</p>
+  </div>
+  {% endif %}
+</div>
+{% empty %}
+<div class="card"><div class="empty">
+  <h3>No projects</h3><p>Nothing active matches these filters.</p>
+</div></div>
+{% endfor %}
+
+{% if unassigned %}
+<div class="card">
+  <div class="card-h"><h3>Unassigned open tasks</h3><span class="tag warn">{{ unassigned|length }}</span></div>
+  <div class="card-b">
+    <p class="hint" style="margin:0 0 10px">Work with nobody's name on it. Assign
+      it from the weekly planner or the task page.</p>
+    <div class="backlog">
+      {% for t in unassigned %}
+      <a class="chip prio-{{ t.priority|lower }}" href="{{ t.get_absolute_url }}">
+        {{ t.title|truncatechars:30 }}
+        <span class="chip-meta">{{ t.project.name|truncatechars:16 }}{% if t.due_date %} · {{ t.due_date|date:"d M" }}{% endif %}</span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

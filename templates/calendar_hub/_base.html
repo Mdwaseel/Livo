@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% comment %}
+Shared shell for the four calendar views: view switcher, period stepper, filter
+bar, and the legend — which doubles as the category filter, so the key that
+explains the colours is the same control that turns them off.
+
+One URL grammar across every view (?date= anchors, ?employee=/?department=/
+?project=/?client=/?kind= narrow, ?q= searches), matching the resource
+planner's, so a filter survives switching from month to agenda.
+{% endcomment %}
+
+{% block crumb %}Calendar{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>{% block heading %}Calendar{% endblock %}</h2>
+    <p>{% block lede %}Everything the agency has on, in one place.{% endblock %}</p>
+  </div>
+  <div class="head-actions">
+    <a class="btn sm ghost" href="{% url 'calendar_hub:ics' mode=mode %}?{{ querystring }}{% if querystring %}&{% endif %}date={{ window.anchor|date:'Y-m-d' }}"
+       title="Download this period as an .ics file for Google, Outlook or Apple Calendar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <span class="lbl">Export .ics</span></a>
+    {% if can_create %}
+    <a class="btn sm" href="{% url 'calendar_hub:event_create' %}?date={{ window.start|date:'Y-m-d' }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      <span class="lbl">New event</span></a>
+    {% endif %}
+  </div>
+</div>
+
+<nav class="subnav" aria-label="Calendar views">
+  <a href="{% url 'calendar_hub:month' %}?{{ querystring }}{% if querystring %}&{% endif %}date={{ window.start|date:'Y-m-d' }}" {% if mode == 'month' %}class="on" aria-current="page"{% endif %}>Month</a>
+  <a href="{% url 'calendar_hub:week' %}?{{ querystring }}{% if querystring %}&{% endif %}date={{ window.start|date:'Y-m-d' }}" {% if mode == 'week' %}class="on" aria-current="page"{% endif %}>Week</a>
+  <a href="{% url 'calendar_hub:day' %}?{{ querystring }}{% if querystring %}&{% endif %}date={{ window.start|date:'Y-m-d' }}" {% if mode == 'day' %}class="on" aria-current="page"{% endif %}>Day</a>
+  <a href="{% url 'calendar_hub:agenda' %}?{{ querystring }}{% if querystring %}&{% endif %}date={{ window.start|date:'Y-m-d' }}" {% if mode == 'agenda' %}class="on" aria-current="page"{% endif %}>Agenda</a>
+</nav>
+
+<form method="get" class="card filter-card" role="search" aria-label="Calendar filters">
+  <div class="filter-bar">
+    <div class="period-step">
+      <a class="btn sm ghost" href="?{{ querystring }}{% if querystring %}&{% endif %}date={{ window.previous|date:'Y-m-d' }}" aria-label="Previous period">&larr;</a>
+      <strong class="period-label">{{ window.title }}</strong>
+      <a class="btn sm ghost" href="?{{ querystring }}{% if querystring %}&{% endif %}date={{ window.next|date:'Y-m-d' }}" aria-label="Next period">&rarr;</a>
+      <a class="btn sm ghost" href="{{ request.path }}?{{ querystring }}">Today</a>
+    </div>
+    <label class="fb-field"><span>Search</span>
+      <input type="search" name="q" value="{{ query.search }}" placeholder="Title, project…"></label>
+    <label class="fb-field"><span>Employee</span>
+      <select name="employee">
+        <option value="">All</option>
+        {% for u in options.employees %}
+          <option value="{{ u.pk }}" {% if query.employee_id == u.pk %}selected{% endif %}>{{ u.get_full_name|default:u.username }}</option>
+        {% endfor %}
+      </select></label>
+    <label class="fb-field"><span>Department</span>
+      <select name="department">
+        <option value="">All</option>
+        {% for d in options.departments %}
+          <option value="{{ d.pk }}" {% if query.department_id == d.pk %}selected{% endif %}>{{ d.name }}</option>
+        {% endfor %}
+      </select></label>
+    <label class="fb-field"><span>Project</span>
+      <select name="project">
+        <option value="">All</option>
+        {% for p in options.projects %}
+          <option value="{{ p.pk }}" {% if query.project_id == p.pk %}selected{% endif %}>{{ p.client.name }} — {{ p.name }}</option>
+        {% endfor %}
+      </select></label>
+    <label class="fb-field"><span>Client</span>
+      <select name="client">
+        <option value="">All</option>
+        {% for c in options.clients %}
+          <option value="{{ c.pk }}" {% if query.client_id == c.pk %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+      </select></label>
+    <input type="hidden" name="date" value="{{ window.start|date:'Y-m-d' }}">
+    <button class="btn sm" type="submit">Apply</button>
+    {% if query.is_filtered %}<a class="btn sm ghost" href="{{ request.path }}">Clear</a>{% endif %}
+    <span class="filter-count">{{ total }} entr{{ total|pluralize:"y,ies" }}</span>
+  </div>
+
+  {% comment %}
+  Legend and category filter in one control. The colour swatch is never the only
+  signal — each row carries its marker glyph and its name as text, so the key
+  still works in greyscale and for a colour-blind reader.
+  {% endcomment %}
+  <fieldset class="legend">
+    <legend class="visually-hidden">Show these kinds of entry</legend>
+    {% for row in kind_counts %}
+      {% if row.kind.key in visible_kind_keys %}
+      <label class="legend-chip tone-{{ row.kind.tone }}{% if row.kind.key in selected_kinds %} on{% endif %}">
+        <input type="checkbox" name="kind" value="{{ row.kind.key }}"
+               {% if row.kind.key in selected_kinds %}checked{% endif %}>
+        <span class="marker" aria-hidden="true">{{ row.kind.marker }}</span>
+        <span class="name">{{ row.kind.plural }}</span>
+        <span class="num">{{ row.count }}</span>
+      </label>
+      {% endif %}
+    {% endfor %}
+  </fieldset>
+</form>
+
+{% block calendar %}{% endblock %}
+
+{% comment %}
+The drop target for the whole page. One live region, announced politely, so a
+screen-reader user hears the outcome of a drag they may have performed with a
+keyboard-driven pointer.
+{% endcomment %}
+<div class="drop-toast" id="cal-toast" role="status" aria-live="polite" hidden></div>
+<form id="cal-csrf" hidden>{% csrf_token %}</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// The legend chips are checkboxes, and the `.on` styling comes from the server.
+// Without this the chip looks inert until Apply is pressed — the filter is
+// applied on submit like every other one in the console, but the control still
+// has to acknowledge the click that just happened.
+(function () {
+  document.addEventListener("change", function (event) {
+    var input = event.target;
+    if (!input.matches || !input.matches(".legend-chip input")) return;
+    input.closest(".legend-chip").classList.toggle("on", input.checked);
+  });
+})();
+
+// Drag-and-drop rescheduling.
+//
+// Native HTML5 drag events, no library. Every chip is also a plain link to the
+// thing it represents, so the drag is an enhancement: without a mouse, the item
+// is still reachable and still editable on its own page. That matters — a
+// calendar whose only way to change a date is a drag is unusable with a
+// keyboard.
+(function () {
+  var endpoint = "{% url 'calendar_hub:move' %}";
+  var toast = document.getElementById("cal-toast");
+  var form = document.getElementById("cal-csrf");
+  var token = form ? form.querySelector("[name=csrfmiddlewaretoken]") : null;
+  var dragging = null;
+
+  function say(message, isError) {
+    if (!toast) return;
+    toast.textContent = message;
+    toast.className = "drop-toast on" + (isError ? " bad" : "");
+    toast.hidden = false;
+    window.clearTimeout(say.timer);
+    say.timer = window.setTimeout(function () { toast.hidden = true; }, 5000);
+  }
+
+  document.addEventListener("dragstart", function (event) {
+    var chip = event.target.closest ? event.target.closest("[data-movable]") : null;
+    if (!chip) return;
+    dragging = chip;
+    chip.classList.add("dragging");
+    event.dataTransfer.effectAllowed = "move";
+    // Firefox refuses to start a drag unless something is set.
+    event.dataTransfer.setData("text/plain", chip.dataset.source + ":" + chip.dataset.id);
+  });
+
+  document.addEventListener("dragend", function () {
+    if (dragging) dragging.classList.remove("dragging");
+    document.querySelectorAll(".drop-over").forEach(function (el) {
+      el.classList.remove("drop-over");
+    });
+    dragging = null;
+  });
+
+  document.addEventListener("dragover", function (event) {
+    if (!dragging) return;
+    var cell = event.target.closest ? event.target.closest("[data-drop-date]") : null;
+    if (!cell) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    cell.classList.add("drop-over");
+  });
+
+  document.addEventListener("dragleave", function (event) {
+    var cell = event.target.closest ? event.target.closest("[data-drop-date]") : null;
+    if (cell) cell.classList.remove("drop-over");
+  });
+
+  document.addEventListener("drop", function (event) {
+    if (!dragging) return;
+    var cell = event.target.closest ? event.target.closest("[data-drop-date]") : null;
+    if (!cell) return;
+    event.preventDefault();
+    cell.classList.remove("drop-over");
+
+    var chip = dragging;
+    var target = cell.dataset.dropDate;
+    if (chip.dataset.date === target) return;
+
+    fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": token ? token.value : ""
+      },
+      body: JSON.stringify({
+        source: chip.dataset.source,
+        id: chip.dataset.id,
+        date: target,
+        occurrence: chip.dataset.occurrence || null
+      })
+    }).then(function (response) {
+      return response.json().then(function (data) {
+        return { ok: response.ok, data: data };
+      });
+    }).then(function (result) {
+      if (!result.ok || !result.data.ok) {
+        say(result.data.error || "That couldn't be moved.", true);
+        return;
+      }
+      // Move the node rather than reloading: a full round-trip loses the
+      // scroll position on a month grid, and the server has already confirmed.
+      var slot = cell.querySelector("[data-chip-slot]") || cell;
+      slot.appendChild(chip);
+      chip.dataset.date = target;
+      say(result.data.message || "Moved.");
+    }).catch(function () {
+      say("Couldn't reach the server — nothing was moved.", true);
+    });
+  });
+})();
+
+// Month cells load their full day on demand. Rendering every entry of every
+// day up front would mean a busy month carrying several hundred hidden nodes
+// to save a request most people never make.
+(function () {
+  var panel = document.getElementById("cal-day-panel");
+  if (!panel) return;
+  var body = panel.querySelector("[data-panel-body]");
+  var title = panel.querySelector("[data-panel-title]");
+  var opener = null;
+
+  function close() {
+    panel.hidden = true;
+    if (opener) opener.focus();
+  }
+
+  document.addEventListener("click", function (event) {
+    var trigger = event.target.closest ? event.target.closest("[data-open-day]") : null;
+    if (trigger) {
+      event.preventDefault();
+      opener = trigger;
+      var on = trigger.dataset.openDay;
+      title.textContent = trigger.dataset.dayLabel || on;
+      body.innerHTML = '<p class="muted">Loading…</p>';
+      panel.hidden = false;
+      fetch(trigger.href, {headers: {"X-Requested-With": "XMLHttpRequest"}})
+        .then(function (r) { return r.text(); })
+        .then(function (html) { body.innerHTML = html; })
+        .catch(function () {
+          body.innerHTML = '<p class="muted">Couldn\'t load that day.</p>';
+        });
+      return;
+    }
+    if (event.target.closest && event.target.closest("[data-panel-close]")) close();
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && !panel.hidden) close();
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% load rbac_tags %}
+{% block crumb %}Employees{% endblock %}
+{% block content %}
+{% user_can user 'employees' 'create' as can_add %}
+<div class="page-head">
+  <div><h2>Employees</h2><p>{{ profiles|length }} team member{{ profiles|length|pluralize }}.</p></div>
+  {% if can_add %}
+  <a href="{% url 'employees:create' %}" class="btn">+ Add employee</a>
+  {% endif %}
+</div>
+
+<form method="get" class="filters" style="margin-bottom:16px">
+  <div class="search">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input name="q" value="{{ q }}" placeholder="Search by name or skill…">
+  </div>
+  <select name="department" onchange="this.form.submit()">
+    <option value="">All departments</option>
+    {% for d in departments %}<option value="{{ d.pk }}" {% if department == d.pk|stringformat:"s" %}selected{% endif %}>{{ d.name }}</option>{% endfor %}
+  </select>
+  <select name="designation" onchange="this.form.submit()">
+    <option value="">All designations</option>
+    {% for g in designations %}<option value="{{ g.pk }}" {% if designation == g.pk|stringformat:"s" %}selected{% endif %}>{{ g.name }}</option>{% endfor %}
+  </select>
+  <select name="status" onchange="this.form.submit()">
+    <option value="">All statuses</option>
+    {% for value, label in statuses %}<option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+  {% if q or department or designation or status %}<a href="{% url 'employees:directory' %}" class="btn ghost sm">Clear</a>{% endif %}
+</form>
+
+{% if profiles %}
+<div class="emp-grid">
+  {% for p in profiles %}
+  {% comment %}
+  An offboarded person stays in the directory — their record is the point — but
+  reads as past tense, so the list still answers "who works here" at a glance.
+  {% endcomment %}
+  <a class="emp-card{% if not p.user.is_active %} is-inactive{% endif %}" href="{{ p.get_absolute_url }}">
+    <div class="emp-avatar">
+      {% if p.photo %}<img src="{{ p.photo.url }}" alt="">{% else %}
+      <span>{{ p.display_name|slice:":1"|upper }}</span>{% endif %}
+    </div>
+    <div class="emp-body">
+      <strong>{{ p.display_name }}</strong>
+      <div class="emp-meta">
+        {{ p.user.designation.name|default:"—" }}{% if p.user.department %} · {{ p.user.department.name }}{% endif %}
+      </div>
+      <div style="margin-top:6px">
+        <span class="tag {% if p.status == 'ACTIVE' %}ok{% elif p.status == 'PROBATION' %}info{% elif p.status == 'NOTICE_PERIOD' or p.status == 'ON_LEAVE' %}warn{% else %}danger{% endif %}">{{ p.get_status_display }}</span>
+        {% if not p.user.is_active %}<span class="tag gray">No access</span>{% endif %}
+        {% for s in p.skills.all|slice:":3" %}<span class="tag gray">{{ s.name }}</span>{% endfor %}
+      </div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card"><div class="empty"><h3>No employees found</h3>
+  <p>{% if q or department or designation or status %}Try clearing the filters.{% elif can_add %}Add your first team member.{% endif %}</p></div></div>
+{% endif %}
+{% endblock %}

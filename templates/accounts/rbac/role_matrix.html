@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block crumb %}<a href="{% url 'accounts:role_list' %}">Roles</a> / {{ role.name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h2>{{ role.name }}{% if role.is_system %} <span class="tag gray">system</span>{% endif %}</h2>
+    <p>Tick what this role may do in each module. Changes apply immediately to every user holding the role.</p></div>
+</div>
+<form method="post">
+  {% csrf_token %}
+  <div class="grid-2" style="margin-bottom:16px">
+    <div class="field"><label>Role name{% if role.is_system %} (system — locked){% endif %}</label>
+      <input name="name" value="{{ role.name }}" {% if role.is_system %}readonly style="opacity:.6"{% endif %}></div>
+    <div class="field"><label>Description</label>
+      <input name="description" value="{{ role.description }}"></div>
+  </div>
+  <div class="card">
+    <div class="card-h">
+      <h3>Permission matrix</h3>
+      <span style="font-size:12px;color:var(--ink-soft)">Click a column header to toggle the whole column; “All” toggles a row.</span>
+    </div>
+    <div style="overflow-x:auto">
+    <table id="matrix">
+      <thead><tr>
+        <th>Module</th><th style="text-align:center">All</th>
+        {% for a, label in actions %}<th style="text-align:center;cursor:pointer" class="col-toggle" data-action="{{ a }}" title="Toggle column">{{ label }}</th>{% endfor %}
+      </tr></thead>
+      <tbody>
+      {% for module, cells in rows %}
+        <tr data-module="{{ module.key }}">
+          <td><strong>{{ module.label }}</strong> <span style="color:var(--ink-soft);font-size:11px;font-family:var(--mono)">{{ module.key }}</span></td>
+          <td class="chk"><input type="checkbox" class="row-toggle" aria-label="Toggle all for {{ module.label }}"></td>
+          {% for action, granted in cells %}
+          <td class="chk"><input type="checkbox" name="{{ module.key }}__{{ action }}" data-action="{{ action }}"
+                                 {% if granted %}checked{% endif %} aria-label="{{ module.label }}: {{ action }}"></td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+  <div style="margin-top:16px;display:flex;gap:10px">
+    <button class="btn" type="submit">Save permissions</button>
+    <a href="{% url 'accounts:role_list' %}" class="btn ghost">Back to roles</a>
+  </div>
+</form>
+
+<script>
+var matrix = document.getElementById("matrix");
+function rowBoxes(tr) {
+  return Array.prototype.slice.call(tr.querySelectorAll("input[name]"));
+}
+function syncRowToggle(tr) {
+  var boxes = rowBoxes(tr);
+  tr.querySelector(".row-toggle").checked =
+    boxes.length && boxes.every(function (b) { return b.checked; });
+}
+matrix.querySelectorAll("tbody tr").forEach(function (tr) {
+  syncRowToggle(tr);
+  tr.querySelector(".row-toggle").addEventListener("change", function () {
+    rowBoxes(tr).forEach(function (b) { b.checked = tr.querySelector(".row-toggle").checked; });
+  });
+  rowBoxes(tr).forEach(function (b) {
+    b.addEventListener("change", function () { syncRowToggle(tr); });
+  });
+});
+matrix.querySelectorAll(".col-toggle").forEach(function (th) {
+  th.addEventListener("click", function () {
+    var boxes = matrix.querySelectorAll('input[name][data-action="' + th.dataset.action + '"]');
+    var allOn = Array.prototype.every.call(boxes, function (b) { return b.checked; });
+    boxes.forEach(function (b) { b.checked = !allOn; });
+    matrix.querySelectorAll("tbody tr").forEach(syncRowToggle);
+  });
+});
+</script>
+{% endblock %}

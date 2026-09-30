@@ -1,0 +1,37 @@
+{% extends "client_calendar/review/_base.html" %}
+{% load client_calendar_tags %}
+{% block title %}Your approvals{% endblock %}
+
+{% block content %}
+<section class="cc-hero rv-hero">
+  <p class="cc-eyebrow">{{ client.name }} · approvals</p>
+  <h1 class="cc-hero-title">Hi {{ reviewer.first_name }}</h1>
+  <p class="cc-hero-lede">{% if pending %}{{ pending|length }} item{{ pending|length|pluralize }} {{ pending|length|pluralize:"is,are" }} waiting for your go-ahead. Nothing is published until you approve it.{% else %}You're all caught up. Nothing is waiting for your approval right now.{% endif %}</p>
+</section>
+
+{% if pending %}
+<section class="rv-group" aria-labelledby="rv-waiting-h">
+  <h2 class="rv-group-h" id="rv-waiting-h">Waiting for you <span class="rv-count">{{ pending|length }}</span></h2>
+  <div class="rv-items">
+    {% for item in pending %}{% include "client_calendar/review/_item.html" %}{% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if decided %}
+<section class="rv-group" aria-labelledby="rv-done-h">
+  <h2 class="rv-group-h" id="rv-done-h">Already answered</h2>
+  <div class="rv-items">
+    {% for item in decided %}{% include "client_calendar/review/_item.html" %}{% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if not pending and not decided %}
+<div class="cc-empty">
+  {% cc_icon "inbox" "cc-ico cc-empty-ico" %}
+  <h3>Nothing here yet</h3>
+  <p>When {{ agency.agency_name|default:"Livo Digital" }} sends you something to approve, it will appear on this page and in your email.</p>
+</div>
+{% endif %}
+{% endblock %}

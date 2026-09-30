@@ -1,0 +1,402 @@
+{% load static rbac_tags %}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Livo OS{% endblock %}</title>
+<link rel="icon" type="image/png" href="{% static 'img/favicon.png' %}">
+<link rel="apple-touch-icon" href="{% static 'img/apple-touch-icon.png' %}">
+{% comment %}
+Fonts as a real <link> rather than a CSS @import: an @import inside app.css
+can't be discovered until the stylesheet itself has downloaded, which serialised
+two round-trips before any text could paint.
+{% endcomment %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="{% static 'css/app.css' %}">
+{% block head %}{% endblock %}
+</head>
+<body data-max-upload="{{ max_upload_bytes }}" data-max-upload-label="{{ max_upload_label }}">
+{% comment %}
+First thing in the tab order, visible only once focused. The sidebar carries
+around fifteen links and it is on every screen, so without this a keyboard user
+re-traverses the whole of it before reaching the page they asked for — on every
+navigation, all day. This is a console people live in, which makes it worth more
+here than on a site somebody visits twice.
+{% endcomment %}
+<a class="skip-link" href="#main">Skip to main content</a>
+<button type="button" class="scrim" data-nav-close aria-label="Close menu" tabindex="-1"></button>
+<div class="layout">
+  <aside class="side" id="sidenav">
+    <button type="button" class="side-close" data-nav-close aria-label="Close menu">
+      {% comment %}
+      Sized on the element: an SVG with only a viewBox defaults to 300x150, so a
+      stale stylesheet rendered this close icon as a full-width X over the nav.
+      {% endcomment %}
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="brand">
+      <a href="{% url 'core:dashboard' %}">
+        <img src="{% static 'img/livo-logo.png' %}" alt="Livo Digital">
+      </a>
+      <small>Agency OS</small>
+    </div>
+    <nav class="nav">
+      <a href="{% url 'core:dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        Dashboard</a>
+      <a href="{% url 'clients:list' %}" class="{% if request.path|slice:':9' == '/clients/' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Clients</a>
+      <div class="grp">Workspace</div>
+      <a href="{% url 'projects:list' %}" class="{% if request.path|slice:':10' == '/projects/' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        Projects</a>
+      {% user_can user 'tasks' 'view' as can_tasks %}
+      {% if can_tasks %}
+      <a href="{% url 'tasks:mine' %}" class="{% if request.path|slice:':7' == '/tasks/' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        My tasks</a>
+      {% endif %}
+      {% user_can user 'worklogs' 'view' as can_worklogs %}
+      {% if can_worklogs %}
+      <a href="{% url 'worklogs:mine' %}" class="{% if request.path|slice:':10' == '/worklogs/' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        My work logs</a>
+      {% endif %}
+      <a href="{% url 'documents:list' %}" class="{% if request.path|slice:':11' == '/documents/' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        Documents</a>
+      {% user_can user 'calendar' 'view' as can_calendar %}
+      {% if can_calendar %}
+      <a href="{% url 'calendar_hub:month' %}" class="{% if request.path|slice:':10' == '/calendar/' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="16" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="8" y2="18"/><line x1="12" y1="18" x2="12" y2="18"/></svg>
+        Calendar</a>
+      {% endif %}
+      {% user_can user 'projects' 'view' as can_client_calendars %}
+      {% if can_client_calendars %}
+      <a href="{% url 'client_calendar:index' %}" class="{% if request.path|slice:':18' == '/client-calendars/' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><path d="m9 15 2 2 4-4"/></svg>
+        Client calendars</a>
+      {% endif %}
+      {% user_can user 'business' 'view' as can_business %}
+      {% if can_business %}
+      {% url 'core:business' as business_url %}
+      <a href="{{ business_url }}" class="{% if request.path == business_url %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        Business</a>
+      {% endif %}
+      {% user_can user 'analytics' 'view' as can_analytics %}
+      {% comment %}
+      No separate "Executive" item: for anyone holding `analytics.view` the
+      executive rollup IS the Dashboard link at the top of this nav (see
+      core.views.dashboard). A second entry pointing at the same page is a
+      thing people click twice to check they are in the right place.
+      {% endcomment %}
+      {% if can_analytics %}
+      <a href="{% url 'analytics:dashboard' %}" class="{% if request.path|slice:':11' == '/analytics/' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Analytics</a>
+      {% endif %}
+      {% user_can user 'resource_planning' 'view' as can_planning %}
+      {% user_can user 'employees' 'view' as can_emp %}
+      {% if can_emp or can_planning %}
+      <div class="grp">People</div>
+      {% endif %}
+      {% if can_planning %}
+      <a href="{% url 'resource_planner:overview' %}" class="{% if request.path|slice:':10' == '/planning/' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Resource planner</a>
+      {% endif %}
+      {% if can_emp %}
+      {% comment %}
+      Matched on the resolved URL name rather than a path prefix: the leave,
+      salary and payroll screens all live under /employees/ too, and a prefix
+      test would light this up while you were on any of them.
+      {% endcomment %}
+      {% with route=request.resolver_match.url_name %}
+      <a href="{% url 'employees:directory' %}" class="{% if route == 'directory' or route == 'detail' or route == 'edit_basic' or route == 'edit_hr' or route == 'create' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Employees</a>
+      {% endwith %}
+      {% endif %}
+      {% user_can user 'payroll' 'view' as can_payroll %}
+      {% if can_payroll %}
+      <a href="{% url 'employees:payroll' %}" class="{% if request.path == '/employees/payroll/' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        Payroll</a>
+      {% endif %}
+      <div class="grp">Account</div>
+      <a href="{% url 'employees:me' %}" class="{% if request.path == '/employees/me/' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        My account</a>
+      {% comment %}
+      Self-service: no permission gates these — asking for leave, and seeing
+      your own pay, are not privileges.
+      {% endcomment %}
+      <a href="{% url 'employees:my_leave' %}" class="{% if request.path == '/employees/leave/' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="m9 16 2 2 4-4"/></svg>
+        My leave</a>
+      <a href="{% url 'employees:my_salary' %}" class="{% if request.path == '/employees/salary/' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg>
+        My salary</a>
+      {% user_can user 'leaves' 'approve' as can_approve_leave %}
+      {% if can_approve_leave or pending_leave_count %}
+      <a href="{% url 'employees:leave_approvals' %}" class="{% if request.path == '/employees/leave/approvals/' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        Leave approvals{% if pending_leave_count %}<span class="nav-count">{{ pending_leave_count }}</span>{% endif %}</a>
+      {% endif %}
+      {% if is_admin_level %}
+      <div class="grp">Admin</div>
+      <a href="{% url 'doc_templates:list' %}" class="{% if request.path|slice:':11' == '/templates/' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+        Templates</a>
+      {% if is_superadmin %}
+      <a href="{% url 'core:activity' %}" class="{% if request.path == '/activity/' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Activity log</a>
+      {% endif %}
+      {% if is_home_admin %}
+      <a href="{% url 'core:workspace_list' %}" class="{% if request.path|slice:':21' == '/settings/workspaces/' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="9" height="8" rx="1.5"/><rect x="13" y="3" width="9" height="8" rx="1.5"/><rect x="2" y="13" width="9" height="8" rx="1.5"/><rect x="13" y="13" width="9" height="8" rx="1.5"/></svg>
+        Workspaces</a>
+      {% endif %}
+      {% if can.settings and is_home_user %}
+      <a href="{% url 'core:settings' %}" class="{% if request.path == '/settings/' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Agency settings</a>
+      {% endif %}
+      {% if is_superadmin and user.is_staff %}
+      <a href="/admin/">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Django admin</a>
+      {% endif %}
+      {% endif %}
+    </nav>
+    <div class="side-foot">
+      {% if user.is_authenticated %}
+        <div class="u">{{ user.get_full_name|default:user.username }}</div>
+        <div class="links">
+          <a href="{% url 'employees:me' %}">My profile</a>
+          <span class="sep" aria-hidden="true">·</span>
+          {# Django 5 dropped GET support from LogoutView — this must be a POST. #}
+          <form method="post" action="{% url 'accounts:logout' %}">
+            {% csrf_token %}
+            <button type="submit" class="linkish">Sign out</button>
+          </form>
+        </div>
+      {% endif %}
+    </div>
+  </aside>
+  <div class="main">
+    <div class="topbar">
+      <button type="button" class="nav-toggle" data-nav-open aria-label="Open menu"
+              aria-controls="sidenav" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <div class="crumb">{% block crumb %}{% endblock %}</div>
+      <div class="topbar-actions">
+        {% comment %}
+        The workspace switcher. Only a home super admin ever sees it — everyone
+        else is pinned to their own partition by core.tenancy and has nothing to
+        switch between. It submits on change rather than hiding behind an Apply
+        button: the whole point is that changing what you're looking at is one
+        action, and a half-selected state that hasn't been applied yet is
+        exactly the ambiguity this feature can't afford.
+        {% endcomment %}
+        {% if can_switch_workspace %}
+        <form method="post" action="{% url 'core:workspace_switch' %}"
+              class="ws-switch{% if not workspace_is_all and active_workspace and not active_workspace.is_home %} away{% endif %}">
+          {% csrf_token %}
+          <label for="ws-select" class="ws-dot" aria-hidden="true"
+                 style="--ws-color:{% if workspace_is_all %}var(--ink-faint){% else %}{{ active_workspace.color|default:'#6366f1' }}{% endif %}"></label>
+          <select name="workspace" id="ws-select" onchange="this.form.submit()"
+                  aria-label="Active workspace">
+            {% for w in workspace_choices %}
+              <option value="{{ w.pk }}"
+                {% if not workspace_is_all and active_workspace.pk == w.pk %}selected{% endif %}>
+                {{ w.name }}{% if w.is_home %} (yours){% endif %}</option>
+            {% endfor %}
+            <option value="all" {% if workspace_is_all %}selected{% endif %}>All workspaces</option>
+          </select>
+        </form>
+        {% endif %}
+        <a href="{% url 'core:notifications' %}" class="bell" title="Notifications" aria-label="Notifications{% if unread_count %} ({{ unread_count }} unread){% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          {% if unread_count %}<span class="badge">{{ unread_count }}</span>{% endif %}
+        </a>
+        {% user_can user 'clients' 'create' as can_add_client %}
+        {% if can_add_client %}
+        <a href="{% url 'clients:create' %}" class="btn sm">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span class="lbl">New client</span></a>
+        {% endif %}
+      </div>
+    </div>
+    {% comment %}
+    A real <main> rather than a div: it is the skip link's target and the
+    landmark a screen reader jumps to. `tabindex="-1"` is what makes the skip
+    actually move focus — without it Safari and older Chrome scroll the page but
+    leave focus back in the nav, so the next Tab lands on the second nav item.
+    {% endcomment %}
+    <main class="content" id="main" tabindex="-1">
+      {% if messages %}{% for m in messages %}
+        <div class="msg {{ m.tags }}">{{ m }}</div>
+      {% endfor %}{% endif %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+<script>
+// Mobile navigation drawer. Below 900px the sidebar is off-canvas; these are
+// the only ways in and out of it.
+(function () {
+  var body = document.body;
+  var toggle = document.querySelector("[data-nav-open]");
+  function setOpen(open) {
+    body.classList.toggle("nav-open", open);
+    if (toggle) toggle.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+  if (toggle) toggle.addEventListener("click", function () {
+    setOpen(!body.classList.contains("nav-open"));
+  });
+  document.querySelectorAll("[data-nav-close]").forEach(function (el) {
+    el.addEventListener("click", function () { setOpen(false); });
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") setOpen(false);
+  });
+  // Rotating back to desktop must not leave the scrim and body lock in place.
+  window.addEventListener("resize", function () {
+    if (window.innerWidth > 900) setOpen(false);
+  });
+})();
+
+// Dropdowns built on <details class="menu">. The element gives us open/closed
+// and keyboard support for free, but nothing else: left alone, a menu opened by
+// mistake stays open until you find its trigger again, and clicking anywhere
+// else on the page does nothing. Handled once here so every menu in the app
+// behaves the way a menu is expected to.
+(function () {
+  function menus() {
+    return document.querySelectorAll("details.menu[open]");
+  }
+  document.addEventListener("click", function (event) {
+    menus().forEach(function (menu) {
+      if (!menu.contains(event.target)) menu.open = false;
+    });
+  });
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "Escape") return;
+    menus().forEach(function (menu) {
+      menu.open = false;
+      // Focus goes back to what opened it, not to the top of the document.
+      if (menu.contains(document.activeElement)) {
+        var summary = menu.querySelector("summary");
+        if (summary) summary.focus();
+      }
+    });
+  });
+})();
+
+// Upload size guard. The server refuses anything over the limit and the upload
+// handler cuts the transfer off mid-stream, which the browser reports as a
+// network error rather than a message anyone can act on — so catch it here,
+// before a single byte leaves the machine, and point at the Drive-link box.
+(function () {
+  var LIMIT = parseInt(document.body.dataset.maxUpload, 10);
+  var LABEL = document.body.dataset.maxUploadLabel || "the limit";
+
+  function readable(bytes) {
+    if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + " MB";
+    return Math.max(1, Math.round(bytes / 1024)) + " KB";
+  }
+
+  // An input (or its form) may carry its own ceiling in `data-max-bytes`, and
+  // `0` there means it has none. Document-template pages are the case that
+  // needs it: they are A4 print masters the server accepts at any size, and
+  // without this the guard below would refuse them in the browser and never
+  // send a byte -- a limit enforced only by the page that says it doesn't
+  // apply. Returns null when this input is not capped at all.
+  function capFor(input) {
+    var own = input.dataset.maxBytes;
+    if ((own === undefined || own === "") && input.form) {
+      own = input.form.dataset.maxBytes;
+    }
+    if (own === undefined || own === "") {
+      return LIMIT ? { bytes: LIMIT, label: LABEL } : null;
+    }
+    var bytes = parseInt(own, 10);
+    return bytes ? { bytes: bytes, label: readable(bytes) } : null;
+  }
+
+  // The Drive-link box belongs to the same <form> as the file input, so scope
+  // the lookup to that form — several upload forms can share one page.
+  function fallbackFor(input) {
+    return input.form ? input.form.querySelector("[data-drive-fallback]") : null;
+  }
+
+  function notice(input) {
+    var existing = input.parentNode.querySelector(".upload-error");
+    if (existing) return existing;
+    var element = document.createElement("div");
+    element.className = "upload-error";
+    element.setAttribute("role", "alert");
+    input.parentNode.insertBefore(element, input.nextSibling);
+    return element;
+  }
+
+  document.addEventListener("change", function (event) {
+    var input = event.target;
+    if (!input.matches || !input.matches('input[type="file"]')) return;
+
+    var cap = capFor(input);
+    var oversized = cap ? Array.prototype.filter.call(input.files || [], function (f) {
+      return f.size > cap.bytes;
+    }) : [];
+    var fallback = fallbackFor(input);
+    var message = notice(input);
+
+    if (!oversized.length) {
+      message.textContent = "";
+      message.classList.remove("on");
+      if (fallback && !fallback.dataset.stayOpen) fallback.hidden = true;
+      return;
+    }
+
+    message.textContent = '"' + oversized[0].name + '" is ' + readable(oversized[0].size)
+      + " — over the " + cap.label + " limit. "
+      + (fallback ? "Paste a Drive link below instead."
+                  : "Upload it to Google Drive and share the link instead.");
+    message.classList.add("on");
+    // Clearing it stops a submit that would only fail, and makes the required
+    // attribute block the form until something valid is chosen.
+    input.value = "";
+    if (fallback) {
+      fallback.hidden = false;
+      var url = fallback.querySelector("input");
+      if (url) url.focus();
+    }
+  });
+
+  // A file input and a Drive link are alternatives, not a pair — sending both
+  // would silently store the file and drop the link.
+  document.addEventListener("submit", function (event) {
+    var form = event.target;
+    var fallback = form.querySelector && form.querySelector("[data-drive-fallback]");
+    if (!fallback) return;
+    var url = fallback.querySelector("input");
+    var file = form.querySelector('input[type="file"]');
+    if (url && url.value.trim() && file) file.removeAttribute("required");
+  });
+})();
+</script>
+{% comment %}
+Per-page scripts land here, after the shared ones and after the DOM they act
+on — so a page never has to repeat the drawer or upload logic to add its own.
+{% endcomment %}
+{% block scripts %}{% endblock %}
+</body>
+</html>

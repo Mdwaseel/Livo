@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% load static %}
+{% block crumb %}Business{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Business overview</h2>
+    <p>Revenue, what's still owed, and which way it's moving.
+       {{ start|date:"d M Y" }} – {{ end|date:"d M Y" }}.</p>
+  </div>
+  {% comment %}
+  The privacy control sits in the page head, not buried in a menu: its whole
+  job is to be reachable in the second before you share your screen. It starts
+  ON, so the page is safe by default and revealing is the deliberate act.
+  {% endcomment %}
+  <button type="button" class="btn ghost" data-privacy-toggle hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+         stroke-linecap="round" stroke-linejoin="round" data-privacy-icon-on>
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+      <path d="m1 1 22 22"/>
+    </svg>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+         stroke-linecap="round" stroke-linejoin="round" data-privacy-icon-off hidden>
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+    </svg>
+    <span class="lbl" data-privacy-label>Show figures</span>
+  </button>
+  {% comment %}
+  The button ships hidden and is revealed by its own script. Without JavaScript
+  there is nothing to press, and a dead control that never unblurs anything is
+  worse than no control — the note says so instead.
+  {% endcomment %}
+  <noscript><span class="hint">Figures stay hidden while JavaScript is off.</span></noscript>
+</div>
+
+<form method="get" class="filter-bar" style="margin-bottom:18px">
+  <label class="fb-field"><span>From</span>
+    <input type="date" name="start" value="{{ start|date:'Y-m-d' }}"></label>
+  <label class="fb-field"><span>To</span>
+    <input type="date" name="end" value="{{ end|date:'Y-m-d' }}"></label>
+  <button class="btn sm" type="submit">Apply</button>
+</form>
+
+<div class="stat-grid" data-private>
+  <div class="stat">
+    <div class="bar"></div>
+    <div class="n">₹{{ finance.revenue|floatformat:"0g" }}</div>
+    <div class="l">Received in range</div>
+  </div>
+  <div class="stat">
+    <div class="bar"></div>
+    <div class="n">₹{{ finance.portfolio_value|floatformat:"0g" }}</div>
+    <div class="l">Portfolio value</div>
+  </div>
+  <div class="stat{% if finance.outstanding > 0 %} tone-warn{% endif %}">
+    <div class="bar"></div>
+    <div class="n">₹{{ finance.outstanding|floatformat:"0g" }}</div>
+    <div class="l">Outstanding</div>
+  </div>
+  <div class="stat">
+    <div class="bar"></div>
+    <div class="n">{{ finance.collection_percent|floatformat:"0" }}%</div>
+    <div class="l">Collected of billed</div>
+  </div>
+  <div class="stat">
+    <div class="bar"></div>
+    <div class="n">₹{{ finance.avg_project_value|floatformat:"0g" }}</div>
+    <div class="l">Average project</div>
+  </div>
+  <div class="stat">
+    <div class="bar"></div>
+    <div class="n">{{ finance.payment_count }}</div>
+    <div class="l">Payments received</div>
+  </div>
+</div>
+
+<div class="chart-grid" data-private>
+  {% include "analytics/_chart_card.html" with chart_id="revenue-trend" title="Revenue" caption="Payments received per month." empty="No payments received in this range." %}
+  {% include "analytics/_chart_card.html" with chart_id="monthly-growth" title="Growth" caption="Revenue, hours and completed tasks, each indexed to 100 at its starting month." empty="Not enough history yet — growth needs at least one month with figures in it." %}
+  {% if "client-revenue" in charts %}
+  {% include "analytics/_chart_card.html" with chart_id="client-revenue" title="Collected vs outstanding by client" caption="Click a bar to open that client — the table below carries the same links." empty="Nothing outstanding." %}
+  {% endif %}
+  {% include "analytics/_chart_card.html" with chart_id="collection" title="Collection" caption="Of everything billed across live projects, how much has landed." height=260 empty="Nothing billed yet on live projects." %}
+</div>
+
+<div class="card" style="margin-top:18px" data-private>
+  <div class="card-h"><h3>Owed to us</h3>
+    <span class="hint">Largest first</span></div>
+  {% if owing %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr>
+        <th>Client</th>
+        <th style="text-align:right">Billed</th>
+        <th style="text-align:right">Collected</th>
+        <th style="text-align:right">Outstanding</th>
+        <th style="text-align:right">Collected %</th>
+      </tr></thead>
+      <tbody>
+        {% for r in owing %}
+        <tr>
+          <td><a href="{{ r.client.get_absolute_url }}"><strong>{{ r.client.name }}</strong></a>
+            <div class="hint">{{ r.active_projects }} active of {{ r.project_count }}</div></td>
+          <td style="text-align:right">₹{{ r.value|floatformat:"0g" }}</td>
+          <td style="text-align:right">₹{{ r.revenue|floatformat:"0g" }}</td>
+          <td style="text-align:right"><strong>₹{{ r.outstanding|floatformat:"0g" }}</strong></td>
+          <td style="text-align:right">
+            <span class="pill {% if r.collection_percent >= 80 %}pill-available{% elif r.collection_percent >= 40 %}pill-near{% else %}pill-over{% endif %}">
+              {{ r.collection_percent|floatformat:"0" }}%</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card-b"><p class="empty">Nothing outstanding. Everything billed has been collected.</p></div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ charts|json_script:"chart-configs" }}
+<script>
+// The privacy blur. The mask itself is CSS and is already painted; this only
+// lifts it. Deliberately placed ahead of the charting library so the reveal
+// decision is made on the first tick rather than after a few hundred kilobytes
+// of JavaScript has downloaded — the state you get without doing anything, on
+// a fresh device or in a private window, is hidden.
+(function () {
+  var KEY = "dv-business-visible";
+  var button = document.querySelector("[data-privacy-toggle]");
+  if (!button) return;
+  var label = button.querySelector("[data-privacy-label]");
+  var iconOn = button.querySelector("[data-privacy-icon-on]");
+  var iconOff = button.querySelector("[data-privacy-icon-off]");
+  var panels = document.querySelectorAll("[data-private]");
+
+  function read() {
+    // Any storage failure — private window, blocked site data — reads as
+    // "hidden", never as "reveal everything".
+    try { return window.localStorage.getItem(KEY) === "1"; } catch (e) { return false; }
+  }
+
+  function apply(visible) {
+    panels.forEach(function (panel) { panel.classList.toggle("is-revealed", visible); });
+    if (label) label.textContent = visible ? "Hide figures" : "Show figures";
+    if (iconOn) iconOn.hidden = visible;
+    if (iconOff) iconOff.hidden = !visible;
+  }
+
+  apply(read());
+  button.hidden = false;   // only now is it a control that does something
+  button.addEventListener("click", function () {
+    var next = !read();
+    try { window.localStorage.setItem(KEY, next ? "1" : "0"); } catch (e) { /* session only */ }
+    apply(next);
+  });
+})();
+</script>
+<script src="{% static 'js/chart.umd.js' %}"></script>
+<script src="{% static 'js/charts.js' %}"></script>
+{% endblock %}

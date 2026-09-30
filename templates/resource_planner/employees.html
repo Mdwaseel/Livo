@@ -1,0 +1,50 @@
+{% extends "resource_planner/_base.html" %}
+
+{% block heading %}Employee workload{% endblock %}
+{% block lede %}Capacity, allocation and utilisation per person.{% endblock %}
+
+{% block planner %}
+<div class="card">
+  <div class="card-h"><h3>{{ window.start|date:"d M" }} &ndash; {{ window.end|date:"d M Y" }}</h3>
+    <span class="tag gray">{{ rows|length }} {{ rows|length|pluralize:"person,people" }}</span></div>
+  {% if rows %}
+  <div class="table-wrap"><table>
+    <thead><tr>
+      <th>Person</th>
+      <th title="Working hours in this period, with approved leave already deducted">Capacity</th>
+      <th title="Hours logged plus the remaining estimate of open tasks due in this period">Allocated</th>
+      <th>Remaining</th>
+      <th>Utilisation</th>
+      <th title="Remaining hours on open tasks in a sprint running today">Sprint</th>
+      <th title="Open work due in the next 90 days">Upcoming</th>
+      <th>Status</th>
+      {% if can_edit_capacity %}<th></th>{% endif %}
+    </tr></thead>
+    <tbody>
+      {% for r in rows %}{% include "resource_planner/_person_row.html" with r=r %}{% endfor %}
+    </tbody>
+    <tfoot><tr>
+      <td><strong>Total</strong></td>
+      <td><strong>{{ summary.capacity|floatformat:"-2" }} h</strong></td>
+      <td><strong>{{ summary.allocated|floatformat:"-2" }} h</strong></td>
+      <td class="{% if summary.remaining < 0 %}num-over{% endif %}"><strong>{{ summary.remaining|floatformat:"-2" }} h</strong></td>
+      <td><strong>{{ summary.utilization_percent|floatformat:"0" }}%</strong></td>
+      <td colspan="{% if can_edit_capacity %}4{% else %}3{% endif %}"></td>
+    </tr></tfoot>
+  </table></div>
+  {% else %}
+  <div class="empty">
+    <h3>Nobody to plan</h3>
+    <p>No active employees match these filters. Resigned and terminated staff are
+       excluded so they don't inflate the agency's available hours.</p>
+  </div>
+  {% endif %}
+</div>
+
+<p class="hint" style="margin-top:12px">
+  Capacity defaults to 8 h/day, Monday to Friday, for anyone without a saved
+  profile{% if can_edit_capacity %} — use <strong>Capacity</strong> on a row to change it{% endif %}.
+  Allocation counts logged hours plus the <em>remaining</em> estimate of open
+  tasks, so work in progress is never counted twice.
+</p>
+{% endblock %}

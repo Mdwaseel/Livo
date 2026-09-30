@@ -1,0 +1,40 @@
+{% extends "analytics/_base.html" %}
+
+{% block heading %}Client analytics{% endblock %}
+{% block lede %}Engagement and value per client for the selected range.{% endblock %}
+
+{% block analytics %}
+<div class="card">
+  <div class="card-h"><h3>Per client</h3><span class="tag gray">{{ rows|length }}</span></div>
+  {% if rows %}
+  <div class="table-wrap"><table>
+    <thead><tr>
+      <th>Client</th><th>Projects</th><th>Active</th>
+      <th title="Hours logged in range">Hours</th>
+      <th title="Documents created in range">Documents</th>
+      {% if can_view_finance %}<th>Value</th><th>Revenue</th><th>Outstanding</th>{% endif %}
+      <th style="text-align:right">Health</th>
+    </tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td><a href="{{ r.client.get_absolute_url }}"><strong>{{ r.client.name }}</strong></a></td>
+        <td>{{ r.project_count }}</td>
+        <td>{{ r.active_projects }}</td>
+        <td>{{ r.hours|floatformat:"-2" }}</td>
+        <td>{{ r.documents }}</td>
+        {% if can_view_finance %}
+          <td>₹{{ r.value|floatformat:"0g" }}</td>
+          <td>₹{{ r.revenue|floatformat:"0g" }}</td>
+          <td class="{% if r.outstanding > 0 %}num-over{% endif %}">₹{{ r.outstanding|floatformat:"0g" }}</td>
+        {% endif %}
+        <td style="text-align:right">
+          <span class="tag {% if r.health >= 75 %}ok{% elif r.health >= 50 %}warn{% else %}gray{% endif %}">{{ r.health }}</span></td>
+      </tr>
+    {% endfor %}
+    </tbody></table></div>
+  {% else %}
+  <div class="empty"><h3>No clients match</h3><p>Try widening the filters.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

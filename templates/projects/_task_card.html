@@ -1,0 +1,102 @@
+{% load rbac_tags %}
+{% comment %}
+Task card. Expects: t (Task), back (URL to return to after an action).
+Optional: show_project (bool) — used by My Tasks, where the project isn't
+implied by the page.
+{% endcomment %}
+{% user_can user 'tasks' 'edit' as can_edit_tasks %}
+{% user_can user 'tasks' 'approve' as can_approve_tasks %}
+{% user_can user 'tasks' 'delete' as can_delete_tasks %}
+{% with prog=t.checklist_progress blockers=t.open_blockers %}
+<div class="task {% if t.status == 'DONE' %}done{% endif %} {% if t.is_overdue %}overdue{% endif %}">
+  <div class="task-top">
+    <a class="task-title" href="{% url 'projects:task_detail' t.pk %}">{{ t.title }}</a>
+    <span class="tag {% if t.priority == 'HIGH' %}danger{% elif t.priority == 'LOW' %}gray{% else %}warn{% endif %}">{{ t.get_priority_display }}</span>
+  </div>
+
+  {% if show_project %}
+  <div class="task-proj">{{ t.project.name }} · {{ t.project.client.name }}</div>
+  {% endif %}
+
+  <div class="task-meta">
+    {% if t.assignee %}
+      <span class="tm">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        {{ t.assignee.get_full_name|default:t.assignee.username }}</span>
+    {% else %}
+      <span class="tm muted">Unassigned</span>
+    {% endif %}
+
+    {% if t.due_date %}
+      <span class="tm {% if t.is_overdue %}is-overdue{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        {% if t.is_overdue %}Overdue · {% endif %}{{ t.due_date|date:"d M" }}</span>
+    {% endif %}
+
+    {% if prog.total %}
+      <span class="tm">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        {{ prog.done }}/{{ prog.total }}</span>
+    {% endif %}
+
+    {% if t.estimated_hours %}<span class="tm">{{ t.estimated_hours|floatformat:"-2" }}h est</span>{% endif %}
+    {% if t.completed_on %}<span class="tm">done {{ t.completed_on|date:"d M" }}</span>{% endif %}
+  </div>
+
+  <div class="task-flags">
+    {% if blockers %}
+      <span class="tag danger" title="{% for b in blockers %}{{ b.title }}{% if not forloop.last %}, {% endif %}{% endfor %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="4.9" y1="4.9" x2="19.1" y2="19.1"/></svg>
+        Blocked by {{ blockers|length }}</span>
+    {% endif %}
+    {% if t.approval_status == 'SUBMITTED' %}
+      <span class="tag info">Awaiting {% if t.reviewer %}{{ t.reviewer.get_full_name|default:t.reviewer.username }}{% else %}review{% endif %}</span>
+    {% elif t.approval_status == 'REOPENED' %}
+      <span class="tag warn">Reopened</span>
+    {% elif t.approval_status == 'APPROVED' %}
+      <span class="tag ok">Approved</span>
+    {% endif %}
+    {% if t.department %}<span class="tag gray">{{ t.department.name }}</span>{% endif %}
+  </div>
+
+  <div class="task-actions">
+    {% if can_edit_tasks or t.assignee_id == user.pk %}
+      {% if t.status == 'TODO' %}
+        <form method="post" action="{% url 'projects:task_set_status' t.pk %}">{% csrf_token %}
+          <input type="hidden" name="next" value="{{ back }}">
+          <input type="hidden" name="status" value="IN_PROGRESS">
+          <button class="link-act" type="submit">Start</button></form>
+      {% endif %}
+      {% if t.status != 'DONE' and t.approval_status != 'SUBMITTED' %}
+        {% if t.reviewer %}
+          <form method="post" action="{% url 'projects:task_submit' t.pk %}">{% csrf_token %}
+            <input type="hidden" name="next" value="{{ back }}">
+            <button class="link-act" type="submit">Submit for review</button></form>
+        {% else %}
+          <form method="post" action="{% url 'projects:task_set_status' t.pk %}">{% csrf_token %}
+            <input type="hidden" name="next" value="{{ back }}">
+            <input type="hidden" name="status" value="DONE">
+            <button class="link-act" type="submit">Done</button></form>
+        {% endif %}
+      {% endif %}
+      {% if t.status == 'DONE' %}
+        <form method="post" action="{% url 'projects:task_set_status' t.pk %}">{% csrf_token %}
+          <input type="hidden" name="next" value="{{ back }}">
+          <input type="hidden" name="status" value="IN_PROGRESS">
+          <button class="link-act" type="submit">Reopen</button></form>
+      {% endif %}
+    {% endif %}
+
+    {% if t.approval_status == 'SUBMITTED' %}
+      {% if can_approve_tasks or t.reviewer_id == user.pk %}
+      <form method="post" action="{% url 'projects:task_approve' t.pk %}">{% csrf_token %}
+        <input type="hidden" name="next" value="{{ back }}">
+        <button class="link-act strong" type="submit">Approve</button></form>
+      <a href="{% url 'projects:task_detail' t.pk %}#review" class="link-act">Reopen…</a>
+      {% endif %}
+    {% endif %}
+
+    <a href="{% url 'projects:task_detail' t.pk %}" class="link-act muted">Open</a>
+  </div>
+</div>
+{% endwith %}

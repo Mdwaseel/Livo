@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block crumb %}<a href="{% url 'employees:directory' %}">Employees</a> / New{% endblock %}
+{% block content %}
+<div class="page-head"><div><h2>Add employee</h2>
+  <p>Creates their login and profile. Share the temporary password securely — they should change it on first sign-in.</p></div></div>
+<form method="post"><div class="grid-2">
+  {% csrf_token %}
+  <div class="card"><div class="card-h"><h3>Account</h3></div><div class="card-b">
+    <div class="row">
+      <div class="field"><label>First name</label><input name="first_name"></div>
+      <div class="field"><label>Last name</label><input name="last_name"></div>
+    </div>
+    <div class="field"><label>Username *</label><input name="username" required></div>
+    <div class="field"><label>Work email</label><input name="email" type="email"></div>
+    <div class="field"><label>Phone</label><input name="phone"></div>
+    <div class="field"><label>Temporary password *</label><input name="password" required autocomplete="new-password"></div>
+  </div></div>
+  <div>
+    <div class="card"><div class="card-h"><h3>Role &amp; organisation</h3></div><div class="card-b">
+      <div class="field"><label>Primary role</label>
+        <select name="primary_role"><option value="">— none —</option>
+          {% for r in roles %}<option value="{{ r.pk }}">{{ r.name }}</option>{% endfor %}
+        </select></div>
+      <div class="row">
+        <div class="field"><label>Department</label>
+          <select name="department"><option value="">—</option>
+            {% for d in departments %}<option value="{{ d.pk }}">{{ d.name }}</option>{% endfor %}
+          </select></div>
+        <div class="field"><label>Designation</label>
+          <select name="designation"><option value="">—</option>
+            {% for g in designations %}<option value="{{ g.pk }}">{{ g }}</option>{% endfor %}
+          </select></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Reports to</label>
+          <select name="reports_to"><option value="">—</option>
+            {% for m in managers %}<option value="{{ m.pk }}">{{ m.get_full_name|default:m.username }}</option>{% endfor %}
+          </select></div>
+        <div class="field"><label>Employee code</label><input name="employee_code" placeholder="e.g. DV-011"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Date of joining</label><input type="date" name="date_of_joining"></div>
+        <div class="field"><label>Status</label>
+          <select name="status">
+            {% for value, label in statuses %}<option value="{{ value }}" {% if value == 'PROBATION' %}selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select></div>
+      </div>
+    </div></div>
+    <div style="margin-top:16px;display:flex;gap:10px">
+      <button class="btn" type="submit">Create employee</button>
+      <a href="{% url 'employees:directory' %}" class="btn ghost">Cancel</a>
+    </div>
+  </div>
+</div></form>
+{% endblock %}

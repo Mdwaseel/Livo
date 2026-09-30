@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% load static client_calendar_tags %}
+{% block title %}Ask for approval · {{ activity.title }}{% endblock %}
+{% block head %}<link rel="stylesheet" href="{% static 'css/client_calendar.css' %}"><link rel="stylesheet" href="{% static 'css/client_review.css' %}">{% endblock %}
+{% block crumb %}<a href="{% url 'client_calendar:index' %}">Client calendars</a> / <a href="{% url 'client_calendar:planner' client.pk %}">{{ client.name }}</a> / Ask for approval{% endblock %}
+
+{% block content %}
+<div class="cc ap-page">
+<div class="page-head">
+  <div>
+    <h2>{% if previous %}Send version {{ previous.version|add:1 }} for approval{% else %}Ask {{ client.name }} to approve{% endif %}</h2>
+    <p>They'll get an email with a private link to review “{{ activity.title }}” and approve it or ask for changes.</p>
+  </div>
+</div>
+
+{% if errors %}
+<div class="msg error" role="alert">Some details need another look — they're marked below.{% if errors.files_again %} {{ errors.files_again }}{% endif %}</div>
+{% endif %}
+
+<div class="ap-form-layout">
+<form method="post" enctype="multipart/form-data" class="card ap-form" novalidate
+      data-ap-form data-max-bytes="{{ max_bytes }}" data-max-files="{{ max_files }}">
+  {% csrf_token %}
+  <div class="card-b">
+
+    <fieldset class="cc-fieldset">
+      <legend class="cc-flabel">Who should approve it?</legend>
+      {% if people %}
+      <div class="ap-people">
+        {% for p in people %}
+        <label class="ap-person-opt">
+          <input type="checkbox" name="people" value="{{ p.value }}"{% if p.value in form.people %} checked{% endif %}>{# approval requests still reach people who unsubscribed from update emails #}
+          <span class="ap-person-card">
+            <span class="ap-avatar" aria-hidden="true">{{ p.name|slice:":1"|upper }}</span>
+            <span class="ap-person-main">
+              <strong>{{ p.name }}{% if p.primary %} <em class="tag gray">Primary</em>{% endif %}</strong>
+              <small>{{ p.email }}{% if p.note %} · {{ p.note }}{% endif %}</small>
+              {% if p.reviewer and p.reviewer.verified_at %}<small class="ap-verified">{% cc_icon "shield" %}Has reviewed before</small>{% endif %}
+            </span>
+            <span class="ap-check" aria-hidden="true">{% cc_icon "check" %}</span>
+          </span>
+        </label>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="hint" style="margin-top:0">{{ client.name }} has no contacts with an email address yet. Add the person below, or <a href="{{ client.get_absolute_url }}">add a contact to the client</a>.</p>
+      {% endif %}
+      {% if errors.people %}<p class="cc-error">{{ errors.people }}</p>{% endif %}
+
+      <div class="field ap-new">
+        <p class="ap-new-l">{% if people %}Someone else{% else %}Send it to{% endif %}</p>
+        {% for name, email in form.new %}
+        <div class="ap-new-row" data-ap-new-row>
+          <input name="new_name" value="{{ name }}" placeholder="Name" aria-label="Name" autocomplete="off">
+          <input name="new_email" type="email" multiple value="{{ email }}" placeholder="name@company.com, another@company.com" aria-label="Email addresses, separated by commas" autocomplete="off">
+        </div>
+        {% endfor %}
+        <p class="hint" style="margin:0 0 6px">Paste several addresses at once, separated by commas.</p>
+        <button type="button" class="link-act" data-ap-add-row>{% cc_icon "plus" %}Add another person</button>
+        {% if errors.new %}<p class="cc-error">{{ errors.new }}</p>{% endif %}
+      </div>
+    </fieldset>
+
+    <div class="field{% if errors.content %} has-error{% endif %}" style="margin:0">
+      <label for="ap-content">Copy to approve <span class="cc-opt">caption, blog text or ad copy</span></label>
+      <textarea id="ap-content" name="content" rows="8" placeholder="Paste the exact text the client should sign off on.">{{ form.content }}</textarea>
+      {% if errors.content %}<p class="cc-error">{{ errors.content }}</p>{% endif %}
+    </div>
+
+    <div class="row">
+      <div class="field{% if errors.files %} has-error{% endif %}" style="margin:0">
+        <label for="ap-files">Files <span class="cc-opt">images, video, PDF, documents</span></label>
+        <div class="ap-drop" data-ap-drop>
+          <input id="ap-files" type="file" name="files" multiple data-ap-files>
+          <span class="ap-drop-ico" aria-hidden="true">{% cc_icon "image" %}</span>
+          <span><strong>Choose files</strong> or drop them here</span>
+          <small>Up to {{ max_files }} files, {{ max_upload }} each. Anything bigger? Add a Drive link instead.</small>
+        </div>
+        <ul class="ap-file-list" data-ap-file-list hidden></ul>
+        <p class="cc-error" data-ap-file-error hidden></p>
+        {% if errors.files %}<p class="cc-error">{{ errors.files }}</p>{% endif %}
+      </div>
+      <div class="field{% if errors.links %} has-error{% endif %}" style="margin:0">
+        <label for="ap-links">Links <span class="cc-opt">one per line</span></label>
+        <textarea id="ap-links" name="links" rows="6" placeholder="Blog draft | https://docs.google.com/…&#10;https://drive.google.com/…">{{ form.links }}</textarea>
+        <p class="hint">Google Doc, Drive folder, Figma, a staging page. Put a label before “|” to name it.</p>
+        {% if errors.links %}<p class="cc-error">{{ errors.links }}</p>{% endif %}
+      </div>
+    </div>
+
+    {% if carry_options %}
+    <fieldset class="cc-fieldset">
+      <legend class="cc-flabel">Keep files from version {{ previous.version }}</legend>
+      <div class="ap-carry">
+        {% for asset in carry_options %}
+        <label class="cc-check ap-carry-opt">
+          <input type="checkbox" name="carry" value="{{ asset.pk }}"{% if asset.pk|stringformat:'s' in form.carry %} checked{% endif %}>
+          {% if asset.is_image %}<img src="{{ asset.file.url }}" alt="" width="34" height="34">{% else %}<span class="ap-carry-ico" aria-hidden="true">{% cc_icon asset.icon %}</span>{% endif %}
+          <span>{{ asset.display_name }}</span>
+        </label>
+        {% endfor %}
+      </div>
+      <p class="hint">Untick anything you're replacing with a new upload.</p>
+    </fieldset>
+    {% endif %}
+
+    <div class="row">
+      <div class="field" style="margin:0">
+        <label for="ap-message">Note to the client <span class="cc-opt">optional</span></label>
+        <textarea id="ap-message" name="message" rows="4" placeholder="e.g. Here's the Diwali blog and hero image. Please check the offer dates.">{{ form.message }}</textarea>
+      </div>
+      <div class="field{% if errors.respond_by %} has-error{% endif %}" style="margin:0">
+        <label for="ap-respond">Reply by <span class="cc-opt">optional</span></label>
+        <input id="ap-respond" type="date" name="respond_by" value="{{ form.respond_by }}" min="{{ today|date:'Y-m-d' }}">
+        <p class="hint">It's planned for {{ activity.date|date:"D j M" }}. The date is shown to the client, and late requests are flagged for you.</p>
+        {% if errors.respond_by %}<p class="cc-error">{{ errors.respond_by }}</p>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="cc-form-foot">
+    <button type="submit" class="btn" data-ap-submit>{% cc_icon "send" "" %}<span>Send for approval</span></button>
+    <a class="btn ghost" href="{% if previous %}{{ previous.get_absolute_url }}{% else %}{% url 'client_calendar:activity_edit' activity.pk %}{% endif %}">Cancel</a>
+    {% if previous and previous.is_pending %}<p class="hint ap-foot-note">Version {{ previous.version }} is still waiting. Sending this replaces it, and its link will point the client to the new version.</p>{% endif %}
+  </div>
+</form>
+
+<aside class="ap-side">
+  <div class="card"><div class="card-b">
+    <p class="cc-eyebrow">For approval</p>
+    <h3 class="ap-side-title">{{ activity.title }}</h3>
+    <p class="muted sm">{{ activity.get_kind_display }}{% if activity.platform %} · {{ activity.get_platform_display }}{% endif %} · {{ activity.date|date:"D j M Y" }}</p>
+    <ol class="ap-steps">
+      <li><strong>They get an email</strong> with a “Review &amp; approve” button.</li>
+      <li><strong>They confirm it's them</strong> with a code sent to the same inbox, once per device. A forwarded email won't open it.</li>
+      <li><strong>They approve or ask for changes.</strong> You're told in the app and by email, and the calendar updates itself.</li>
+    </ol>
+  </div></div>
+</aside>
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}<script src="{% static 'js/client_review.js' %}" defer></script>{% endblock %}

@@ -1,0 +1,37 @@
+{% extends "client_calendar/review/_base.html" %}
+{% load client_calendar_tags %}
+{% block title %}Email updates{% endblock %}
+
+{% block content %}
+<section class="rv-verify">
+  <div class="rv-verify-card rv-prefs">
+    <span class="rv-verify-ico">{% cc_icon "email" %}</span>
+    <p class="cc-eyebrow">{{ client.name }} · calendar</p>
+    <h1 class="rv-verify-title">Email updates</h1>
+    <p class="rv-lede">How often should we email <strong>{{ reviewer.masked_email }}</strong> when your content calendar changes?</p>
+
+    {% if saved %}
+    <p class="rv-alert is-ok" role="status">{% cc_icon "check" %}<span>Saved — you'll get {{ reviewer.get_update_frequency_display|lower }}{% if reviewer.update_frequency == "OFF" %} update emails{% else %} emails{% endif %}.</span></p>
+    {% endif %}
+
+    <form method="post" class="rv-prefs-form">
+      <input type="hidden" name="form_key" value="{{ form_key }}">{# not csrf_token: see views_review #}
+      <fieldset class="rv-freqs">
+        <legend class="cc-sr">How often</legend>
+        {% for value, label, help in choices %}
+        <label class="rv-freq">
+          <input type="radio" name="frequency" value="{{ value }}"{% if reviewer.update_frequency == value %} checked{% endif %}>
+          <span class="rv-freq-card">
+            <span class="rv-freq-dot" aria-hidden="true"></span>
+            <span class="rv-freq-main"><strong>{{ label }}</strong><small>{{ help }}</small></span>
+          </span>
+        </label>
+        {% endfor %}
+      </fieldset>
+      <button class="cc-btn cc-btn-primary rv-block" type="submit">Save</button>
+    </form>
+
+    {% if calendar_url %}<p class="rv-fineprint"><a class="rv-textbtn" href="{{ calendar_url }}">{% cc_icon "calendar" %}Open the calendar</a></p>{% endif %}
+  </div>
+</section>
+{% endblock %}

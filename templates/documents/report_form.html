@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block crumb %}<a href="{{ project.client.get_absolute_url }}">{{ project.client.name }}</a> / <a href="{{ project.get_absolute_url }}">{{ project.name }}</a> / Monthly report{% endblock %}
+{% block content %}
+<div class="page-head"><div><h2>Generate monthly report</h2>
+  <p>{{ project.name }} · pulls that month's work log, completed tasks, milestones and proof photos.</p></div></div>
+<form method="post" style="max-width:640px">
+  {% csrf_token %}
+  <div class="card"><div class="card-b">
+    <div class="field"><label>Month *</label>
+      <input type="month" name="month" value="{{ default_month }}" required></div>
+    <div class="field"><label>Highlights <span style="color:var(--ink-soft);font-weight:400">(optional)</span></label>
+      <textarea name="highlights" placeholder="Anything the AI should emphasise — wins, launches, client feedback…"></textarea></div>
+    <div class="field"><label>Proof photos to include</label>
+      {% if image_assets %}
+      <div class="report-assets">
+        {% for a in image_assets %}
+        <label class="report-asset">
+          <input type="checkbox" name="assets" value="{{ a.pk }}" {% if a.is_report_proof %}checked{% endif %}>
+          <img src="{{ a.file.url }}" alt="{{ a.title }}" loading="lazy">
+          <span>{{ a.title }}</span>
+        </label>
+        {% endfor %}
+      </div>
+      <p style="color:var(--ink-soft);font-size:12px;margin-top:6px">Assets flagged “feature in report” are pre-checked. The AI writes the narrative; photos are embedded after it.</p>
+      {% else %}
+      <p style="color:var(--ink-soft);font-size:12.5px">No image assets on this project yet — upload screenshots in the project's Assets section to feature them here.</p>
+      {% endif %}
+    </div>
+  </div></div>
+  <div style="margin-top:16px;display:flex;gap:10px">
+    <button class="btn" type="submit">Generate report</button>
+    <a href="{{ project.get_absolute_url }}" class="btn ghost">Cancel</a>
+  </div>
+</form>
+{% endblock %}

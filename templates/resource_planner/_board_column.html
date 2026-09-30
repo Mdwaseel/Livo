@@ -1,0 +1,27 @@
+{% comment %}
+One column of the availability board. Colour is reinforcement only — the column
+heading names the state in words and every card prints its hours.
+{% endcomment %}
+<div class="card board-col board-{{ tone }}">
+  <div class="card-h"><h3>{{ title }}</h3><span class="tag {{ tone }}">{{ rows|length }}</span></div>
+  <div class="card-b">
+    {% if note %}<p class="hint" style="margin:0 0 10px">{{ note }}</p>{% endif %}
+    {% if rows %}
+      {% for r in rows %}
+      <div class="board-person">
+        <div>
+          <strong>{{ r.user.get_full_name|default:r.user.username }}</strong>
+          <div class="cell-sub">{{ r.department.name|default:"No department" }}</div>
+        </div>
+        <div class="bp-right">
+          <div class="bp-hours {% if r.remaining_capacity < 0 %}num-over{% endif %}">
+            {{ r.remaining_capacity|floatformat:"-2" }} h</div>
+          <div class="cell-sub">{{ r.utilization_percent|floatformat:"0" }}% of {{ r.capacity|floatformat:"-2" }} h</div>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <p class="hint" style="margin:0">{{ empty }}</p>
+    {% endif %}
+  </div>
+</div>

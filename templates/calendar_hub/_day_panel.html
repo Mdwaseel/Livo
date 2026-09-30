@@ -1,0 +1,25 @@
+{% comment %}
+The body of the lazily-loaded day panel — a fragment, not a page. Requested when
+a month cell's "+n more" is used, so the grid only ever ships four chips a cell.
+{% endcomment %}
+{% if detail.events %}
+  {% if detail.all_day %}
+    <div class="divider">All day</div>
+    <div class="ev-list">
+      {% for event in detail.all_day %}
+        {% include "calendar_hub/_event_row.html" with event=event %}
+      {% endfor %}
+    </div>
+  {% endif %}
+  {% if detail.timed %}
+    <div class="divider">Scheduled</div>
+    <div class="ev-list">
+      {% for event in detail.timed %}
+        {% include "calendar_hub/_event_row.html" with event=event %}
+      {% endfor %}
+    </div>
+  {% endif %}
+  <a class="btn sm ghost" href="{% url 'calendar_hub:day' %}?{{ querystring }}{% if querystring %}&{% endif %}date={{ detail.date|date:'Y-m-d' }}">Open this day</a>
+{% else %}
+  <p class="muted">Nothing on this day.</p>
+{% endif %}

@@ -1,0 +1,23 @@
+{% comment %}
+The alternative to storing a file on the VPS. Hidden until the size guard in
+base.html trips, so the normal path stays a single "choose a file" control, but
+still in the DOM (and still posted) so someone who knows they have a big file
+can open it from the hint link without picking a doomed file first.
+
+Include with:  {% include "_drive_fallback.html" %}
+and optionally: {% include "_drive_fallback.html" with label_name="label" %}
+{% endcomment %}
+<div class="drive-fallback" data-drive-fallback hidden>
+  <div class="drive-fallback-h">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>
+    Share a Drive link instead
+  </div>
+  <p>Files over {{ max_upload_label }} aren't stored on the server. Upload it to
+     Google Drive, set sharing to anyone-with-the-link, and paste the link here.</p>
+  <input type="url" name="external_url" placeholder="https://drive.google.com/…"
+         aria-label="Google Drive link">
+  {% if label_name %}
+  <input name="{{ label_name }}" placeholder="What is it? (shown instead of the URL)"
+         aria-label="Link description">
+  {% endif %}
+</div>

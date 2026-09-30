@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% load rbac_tags static %}
+{% block crumb %}Dashboard{% endblock %}
+{% block content %}
+{% comment %}
+The dashboard is deliberately free of money. Revenue, outstanding and the
+collection position live on the Business overview behind their own permission,
+because this page is the one that is open on a laptop in a meeting, on a shared
+screen, and behind whoever is standing at the desk. What is left is the work:
+counts you can say out loud, and the things you were about to open anyway.
+{% endcomment %}
+<div class="page-head">
+  <div><h2>Dashboard</h2><p>Your clients, projects and documents at a glance.</p></div>
+  {% user_can user 'business' 'view' as can_view_business %}
+  {% if can_view_business %}
+  <a href="{% url 'core:business' %}" class="btn ghost">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+    <span class="lbl">Business overview</span></a>
+  {% endif %}
+</div>
+<div class="stat-grid">
+  <div class="stat"><div class="bar"></div><div class="n">{{ client_count }}</div><div class="l">Clients</div></div>
+  <div class="stat"><div class="bar"></div><div class="n">{{ project_count }}</div><div class="l">Projects</div></div>
+  <div class="stat"><div class="bar"></div><div class="n">{{ document_count }}</div><div class="l">Documents</div></div>
+  <div class="stat{% if pending_count %} tone-warn{% endif %}"><div class="bar"></div><div class="n">{{ pending_count }}</div><div class="l">In Review</div></div>
+</div>
+
+{% comment %}
+Charts, and none of them financial. Where the work sits, what is on the board,
+what is waiting on somebody — the questions this page is actually opened for.
+They do not drill through on click, unlike the analytics ones: a clickable mark
+has to land somewhere real, and neither the project list nor the task board
+takes a status filter to land on.
+{% endcomment %}
+<div class="chart-grid" style="margin-top:18px">
+  {% include "analytics/_chart_card.html" with chart_id="project-pipeline" title="Project pipeline" height=260 caption="Every stage is shown, including the empty ones — the gaps are the point." empty="No projects yet. Add a client and their first project appears here." %}
+  {% include "analytics/_chart_card.html" with chart_id="task-board" title="Task board" height=260 caption="Open and finished work across every project you can see." empty="No tasks on the board yet." %}
+  {% include "analytics/_chart_card.html" with chart_id="document-pipeline" title="Documents by state" height=260 caption="Draft, in review, approved, sent." empty="No documents yet. Create a client, then generate your first document." %}
+</div>
+
+<div class="grid-2" style="margin-top:18px">
+  <div class="card">
+    <div class="card-h"><h3>Recent documents</h3></div>
+    {% if recent_documents %}
+    <div class="table-wrap"><table><thead><tr><th>Document</th><th>Client</th><th>Type</th><th>Status</th></tr></thead><tbody>
+    {% for d in recent_documents %}
+      <tr><td><a href="{{ d.get_absolute_url }}"><strong>{{ d.title }}</strong></a></td>
+      <td>{{ d.project.client.name }}</td><td>{{ d.document_type.name }}</td>
+      <td><span class="tag {% if d.status == 'APPROVED' %}ok{% elif d.status == 'REVIEW' %}warn{% else %}gray{% endif %}">{{ d.get_status_display }}</span></td></tr>
+    {% endfor %}</tbody></table></div>
+    {% else %}<div class="empty"><h3>No documents yet</h3><p>Create a client, then generate your first document.</p></div>{% endif %}
+  </div>
+  <div class="card">
+    <div class="card-h"><h3>Recent projects</h3></div>
+    {% if recent_projects %}
+    <table><tbody>
+    {% for p in recent_projects %}
+      <tr><td><a href="{{ p.get_absolute_url }}"><strong>{{ p.name }}</strong></a><br>
+      <span style="color:var(--ink-soft);font-size:12px">{{ p.client.name }}</span></td>
+      <td style="text-align:right"><span class="tag gray">{{ p.get_status_display }}</span></td></tr>
+    {% endfor %}</tbody></table>
+    {% else %}<div class="empty"><h3>No projects yet</h3></div>{% endif %}
+  </div>
+</div>
+{% if is_superadmin %}
+<div class="card" style="margin-top:18px">
+  <div class="card-h"><h3>Recent activity</h3>
+    <a href="{% url 'core:activity' %}" style="font-size:12px;font-weight:600;color:var(--primary)">View all</a></div>
+  {% if recent_activity %}
+  <div class="table-wrap"><table><tbody>
+  {% for e in recent_activity %}
+    <tr><td style="width:150px;color:var(--ink-soft);white-space:nowrap">{{ e.created_at|date:"d M, H:i" }}</td>
+    <td><strong>{{ e.user|default:"—" }}</strong> {{ e.verb }} <span style="color:var(--ink-soft)">{{ e.target }}</span></td></tr>
+  {% endfor %}</tbody></table></div>
+  {% else %}<div class="empty" style="padding:24px"><p>No activity yet.</p></div>{% endif %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{{ charts|json_script:"chart-configs" }}
+<script src="{% static 'js/chart.umd.js' %}"></script>
+<script src="{% static 'js/charts.js' %}"></script>
+{% endblock %}

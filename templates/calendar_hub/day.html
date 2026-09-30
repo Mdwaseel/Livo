@@ -1,0 +1,43 @@
+{% extends "calendar_hub/_base.html" %}
+
+{% block heading %}{{ window.title }}{% endblock %}
+{% block lede %}Everything on this day, nothing collapsed.{% endblock %}
+
+{% block calendar %}
+<div class="card" data-drop-date="{{ detail.date|date:'Y-m-d' }}">
+  <div class="card-h">
+    <h3>{{ detail.date|date:"l j F Y" }}</h3>
+    {% if detail.is_today %}<span class="tag ok">Today</span>{% endif %}
+    <span class="num">{{ detail.events|length }} entr{{ detail.events|length|pluralize:"y,ies" }}</span>
+  </div>
+  <div class="card-b">
+    {% if detail.all_day %}
+      <div class="divider">All day</div>
+      <div class="ev-list" data-chip-slot>
+        {% for event in detail.all_day %}
+          {% include "calendar_hub/_event_row.html" with event=event %}
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% if detail.timed %}
+      <div class="divider">Scheduled</div>
+      <div class="ev-list">
+        {% for event in detail.timed %}
+          {% include "calendar_hub/_event_row.html" with event=event %}
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% if not detail.events %}
+      <div class="empty">
+        <h3>Nothing on</h3>
+        <p>No tasks, meetings or deadlines land on this day{% if query.is_filtered %} with the current filters{% endif %}.</p>
+        {% if can_create %}
+        <a class="btn sm" href="{% url 'calendar_hub:event_create' %}?date={{ detail.date|date:'Y-m-d' }}">Schedule something</a>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

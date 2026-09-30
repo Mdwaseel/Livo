@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block crumb %}Agency settings{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h2>Agency settings</h2><p>Branding and details used across documents and PDF exports.</p></div>
+</div>
+<form method="post" enctype="multipart/form-data"><div class="grid-2">
+  {% csrf_token %}
+  <div class="card"><div class="card-h"><h3>Identity</h3></div><div class="card-b">
+    <div class="field"><label>Agency name</label><input name="agency_name" value="{{ a.agency_name }}"></div>
+    <div class="field"><label>Tagline</label><input name="tagline" value="{{ a.tagline }}"></div>
+    <div class="row">
+      <div class="field"><label>Primary color</label><input name="primary_color" type="color" value="{{ a.primary_color }}" style="height:40px;padding:4px"></div>
+      <div class="field"><label>Logo (PDF header)</label><input name="logo" type="file" accept="image/*"></div>
+    </div>
+    {% if a.logo %}<div class="hint" style="margin-bottom:12px">Current logo: {{ a.logo.name|cut:"branding/" }}</div>{% endif %}
+    <div class="field"><label>Website</label><input name="website" value="{{ a.website }}"></div>
+  </div></div>
+  <div>
+    <div class="card"><div class="card-h"><h3>Contact & tax</h3></div><div class="card-b">
+      <div class="row">
+        <div class="field"><label>Email</label><input name="email" type="email" value="{{ a.email }}"></div>
+        <div class="field"><label>Phone</label><input name="phone" value="{{ a.phone }}"></div>
+      </div>
+      <div class="field"><label>GSTIN</label><input name="gstin" value="{{ a.gstin }}"></div>
+      <div class="field"><label>State (place of supply)</label>
+        <input name="state" value="{{ a.state }}" placeholder="e.g. Telangana">
+        <div class="hint">Compared with the client's state to split invoice GST into
+          CGST + SGST or charge IGST. Leave blank for a single GST line.</div></div>
+      <div class="field"><label>Address</label><textarea name="address">{{ a.address }}</textarea></div>
+      <div class="field"><label>Annual leave days</label>
+        <input type="number" step="1" min="0" name="default_annual_leave_days"
+               value="{{ a.default_annual_leave_days }}">
+        <div class="hint">Paid days off per calendar year. Anyone can be given
+          more on their HR record. Beyond the allowance, leave is deducted from
+          salary at monthly ÷ 30 per day.</div></div>
+    </div></div>
+    <div style="margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button class="btn" type="submit">Save settings</button>
+      <a href="{% url 'doc_templates:list' %}" class="btn ghost">Document templates →</a>
+      <a href="/admin/documents/documenttype/" class="btn ghost">Document types &amp; AI prompts →</a>
+    </div>
+    {% if is_superadmin %}
+    <div class="card" style="margin-top:18px">
+      <div class="card-h"><h3>Access control &amp; org</h3></div>
+      <div class="card-b" style="display:flex;flex-direction:column;gap:8px;font-size:13px">
+        <a href="{% url 'accounts:role_list' %}">Roles &amp; permissions — edit the module × action matrix →</a>
+        <a href="{% url 'accounts:user_list' %}">Team — assign roles, departments, reporting lines →</a>
+        <a href="{% url 'accounts:department_list' %}">Departments →</a>
+        <a href="{% url 'accounts:designation_list' %}">Designations →</a>
+      </div>
+    </div>
+    {% endif %}
+    {% if is_home_admin %}
+    <div class="card" style="margin-top:18px">
+      <div class="card-h"><h3>Partner access</h3></div>
+      <div class="card-b" style="font-size:13px">
+        <p style="color:var(--ink-soft);margin-bottom:10px">
+          Give a partner their own world inside this install: their clients,
+          projects, documents and figures, invisible to your team — and yours
+          invisible to them. You can look into any of them from the switcher in
+          the top bar.</p>
+        <a href="{% url 'core:workspace_list' %}">Workspaces — create partners, assign people →</a>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div></form>
+{% endblock %}

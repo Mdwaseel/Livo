@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block crumb %}<a href="{{ project.client.get_absolute_url }}">{{ project.client.name }}</a> / <a href="{{ project.get_absolute_url }}">{{ project.name }}</a> / Edit milestone{% endblock %}
+{% block content %}
+<div class="page-head"><div><h2>Edit milestone</h2><p>{{ project.name }}</p></div></div>
+<form method="post" style="max-width:560px">
+  {% csrf_token %}
+  <div class="card"><div class="card-b">
+    <div class="field"><label>Title *</label>
+      <input name="title" required value="{{ milestone.title }}"></div>
+    <div class="field"><label>Description</label>
+      <textarea name="description">{{ milestone.description }}</textarea></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="field"><label>Status</label>
+        <select name="status">
+          {% for value, label in statuses %}
+            <option value="{{ value }}" {% if milestone.status == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select></div>
+      <div class="field"><label>Due date</label>
+        <input type="date" name="due_date" value="{{ milestone.due_date|date:'Y-m-d' }}"></div>
+    </div>
+  </div></div>
+  <div style="margin-top:16px;display:flex;gap:10px">
+    <button class="btn" type="submit">Save changes</button>
+    <a href="{{ project.get_absolute_url }}" class="btn ghost">Cancel</a>
+  </div>
+</form>
+{% endblock %}

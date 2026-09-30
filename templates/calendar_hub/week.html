@@ -1,0 +1,47 @@
+{% extends "calendar_hub/_base.html" %}
+
+{% block heading %}{{ window.title }}{% endblock %}
+{% block lede %}Seven days, with all-day entries kept apart from timed ones.{% endblock %}
+
+{% block calendar %}
+{% comment %}
+All-day entries sit in their own band above the timed ones rather than being
+drawn down a time axis. Stretching "on leave all week" across a clock is a lie
+about when it happens, and drawing a 30-minute stand-up at the same height as a
+week of leave makes both unreadable.
+{% endcomment %}
+<div class="card cal-wrap">
+  <div class="cal-week" role="list" aria-label="{{ window.title }}">
+    {% for column in columns %}
+    <div class="cal-col{% if column.is_today %} today{% endif %}{% if column.is_weekend %} weekend{% endif %}"
+         role="listitem" data-drop-date="{{ column.date|date:'Y-m-d' }}">
+      <div class="cal-col-h">
+        <a href="{% url 'calendar_hub:day' %}?{{ querystring }}{% if querystring %}&{% endif %}date={{ column.date|date:'Y-m-d' }}">
+          <span class="dow">{{ column.date|date:"D" }}</span>
+          <span class="dom">{{ column.date|date:"j" }}</span>
+        </a>
+        {% if column.is_today %}<span class="tag ok">Today</span>{% endif %}
+      </div>
+
+      <div class="cal-band" data-chip-slot>
+        {% for event in column.all_day %}
+          {% include "calendar_hub/_chip.html" with event=event %}
+        {% empty %}
+          <p class="band-empty" aria-hidden="true">&nbsp;</p>
+        {% endfor %}
+      </div>
+
+      <div class="cal-timed">
+        {% for event in column.timed %}
+          {% include "calendar_hub/_chip.html" with event=event %}
+        {% empty %}
+          {% if not column.all_day %}<p class="muted sm">Nothing on</p>{% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+{% include "calendar_hub/_strips.html" %}
+{% endblock %}

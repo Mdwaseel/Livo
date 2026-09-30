@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block crumb %}<a href="{% url 'calendar_hub:month' %}">Calendar</a> / {% if is_new %}New event{% else %}Edit{% endif %}{% endblock %}
+
+{% block content %}
+<div class="page-head"><div>
+  <h2>{% if is_new %}Schedule an event{% else %}Edit “{{ event.title }}”{% endif %}</h2>
+  <p>Meetings and events are the one thing the calendar stores itself — everything
+     else on it is read live from the app that owns it.</p>
+</div></div>
+
+<form method="post" style="max-width:760px">
+  {% csrf_token %}
+  <div class="card"><div class="card-b">
+    <div class="row">
+      <div class="field"><label for="f-kind">Type</label>
+        <select name="kind" id="f-kind">
+          {% for value, label in kind_choices %}
+            <option value="{{ value }}" {% if event.kind == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select></div>
+      <div class="field"><label for="f-title">Title</label>
+        <input name="title" id="f-title" value="{{ event.title }}" required maxlength="200"></div>
+    </div>
+
+    <div class="row">
+      <div class="field"><label for="f-start">Starts</label>
+        <input type="date" name="start_date" id="f-start" value="{{ event.start_date|date:'Y-m-d' }}" required></div>
+      <div class="field"><label for="f-end">Ends</label>
+        <input type="date" name="end_date" id="f-end" value="{{ event.end_date|date:'Y-m-d' }}">
+        <div class="hint">Leave blank for a single-day event.</div></div>
+    </div>
+
+    <div class="row">
+      <div class="field"><label for="f-stime">From</label>
+        <input type="time" name="start_time" id="f-stime" value="{{ event.start_time|time:'H:i' }}">
+        <div class="hint">Leave both times blank for an all-day entry.</div></div>
+      <div class="field"><label for="f-etime">To</label>
+        <input type="time" name="end_time" id="f-etime" value="{{ event.end_time|time:'H:i' }}"></div>
+    </div>
+
+    <div class="field"><label for="f-loc">Location</label>
+      <input name="location" id="f-loc" value="{{ event.location }}" maxlength="200"></div>
+    <div class="field"><label for="f-url">Video call link</label>
+      <input type="url" name="meeting_url" id="f-url" value="{{ event.meeting_url }}"
+             placeholder="https://meet.google.com/…"></div>
+    <div class="field"><label for="f-desc">Notes</label>
+      <textarea name="description" id="f-desc">{{ event.description }}</textarea></div>
+  </div></div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="card-h"><h3>Repeat</h3></div>
+    <div class="card-b">
+      <div class="row">
+        <div class="field"><label for="f-freq">Repeats</label>
+          <select name="frequency" id="f-freq">
+            {% for value, label in frequency_choices %}
+              <option value="{{ value }}" {% if event.frequency == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select></div>
+        <div class="field"><label for="f-interval">Every</label>
+          <input type="number" name="interval" id="f-interval" min="1" max="52"
+                 value="{{ event.interval|default:1 }}">
+          <div class="hint">2 = every other day / week / month.</div></div>
+      </div>
+      <div class="field"><span class="lbl">On these days (weekly only)</span>
+        <div class="day-picker">
+          {% for number, label in weekday_choices %}
+            <label><input type="checkbox" name="weekdays" value="{{ number }}"
+                          {% if number in selected_weekdays %}checked{% endif %}>
+              <span>{{ label }}</span></label>
+          {% endfor %}
+        </div>
+        <div class="hint">Leave blank to repeat on the start date’s own weekday.</div></div>
+      <div class="row">
+        <div class="field"><label for="f-until">Until</label>
+          <input type="date" name="repeat_until" id="f-until" value="{{ event.repeat_until|date:'Y-m-d' }}"></div>
+        <div class="field"><label for="f-count">Or stop after</label>
+          <input type="number" name="repeat_count" id="f-count" min="1" max="750"
+                 value="{{ event.repeat_count|default_if_none:'' }}">
+          <div class="hint">Occurrences. Leave both blank to repeat indefinitely.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="card-h"><h3>Who and what it’s about</h3></div>
+    <div class="card-b">
+      <div class="row">
+        <div class="field"><label for="f-project">Project</label>
+          <select name="project" id="f-project">
+            <option value="">—</option>
+            {% for p in options.projects %}
+              <option value="{{ p.pk }}" {% if event.project_id == p.pk %}selected{% endif %}>{{ p.client.name }} — {{ p.name }}</option>
+            {% endfor %}
+          </select>
+          <div class="hint">The client is filled in from the project.</div></div>
+        <div class="field"><label for="f-client">Client (if no project)</label>
+          <select name="client" id="f-client">
+            <option value="">—</option>
+            {% for c in options.clients %}
+              <option value="{{ c.pk }}" {% if event.client_id == c.pk %}selected{% endif %}>{{ c.name }}</option>
+            {% endfor %}
+          </select></div>
+      </div>
+      <div class="row">
+        <div class="field"><label for="f-dept">Department</label>
+          <select name="department" id="f-dept">
+            <option value="">—</option>
+            {% for d in options.departments %}
+              <option value="{{ d.pk }}" {% if event.department_id == d.pk %}selected{% endif %}>{{ d.name }}</option>
+            {% endfor %}
+          </select></div>
+        <div class="field"><label for="f-vis">Who can see it</label>
+          <select name="visibility" id="f-vis">
+            {% for value, label in visibility_choices %}
+              <option value="{{ value }}" {% if event.visibility == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select></div>
+      </div>
+      <div class="field"><label for="f-att">Attendees</label>
+        <select name="attendees" id="f-att" multiple size="8">
+          {% for u in people %}
+            <option value="{{ u.pk }}" {% if u.pk in selected_attendees %}selected{% endif %}>{{ u.get_full_name|default:u.username }}</option>
+          {% endfor %}
+        </select>
+        <div class="hint">Everyone selected is notified, and is reminded before it starts.</div></div>
+      <div class="field"><label for="f-remind">Remind attendees</label>
+        <input type="number" name="reminder_minutes" id="f-remind" min="0" max="10080"
+               value="{{ event.reminder_minutes|default_if_none:'' }}">
+        <div class="hint">Minutes before the start. Leave blank for no reminder.</div></div>
+    </div>
+  </div>
+
+  <div style="margin-top:16px;display:flex;gap:10px">
+    <button class="btn" type="submit">{% if is_new %}Schedule{% else %}Save{% endif %}</button>
+    <a class="btn ghost" href="{% if is_new %}{% url 'calendar_hub:month' %}{% else %}{{ event.get_absolute_url }}{% endif %}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

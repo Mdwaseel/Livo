@@ -1,0 +1,425 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% comment %}
+The Executive Dashboard — what `/` renders for anyone with `analytics.view`.
+
+Reading order is the design: headline tiles, the operational strip, the AI
+brief with what to DO about it, then the evidence (charts), then what is wrong
+(alerts), then the people and the detail. Somebody who reads only the top third
+has still had the question answered.
+
+Everything here is a real figure from a real row. Where this install has no
+data for something an executive dashboard normally carries — tickets, SLA, AMC
+renewals, stock, CSAT, engagement surveys — there is no tile and no
+placeholder, because a plausible-looking zero is the number that gets repeated
+in a meeting. The footer says so out loud rather than leaving a reader to
+wonder whether the figure is hidden, broken, or genuinely zero.
+
+Money is gated twice: `analytics.view` opens the page, `business.view` decides
+whether revenue exists on it at all. `business.view`, not `finance.view` —
+holding the finance key means you can open an invoice, which is not the same as
+being shown the agency's cash position. Tiles, charts and columns are ABSENT
+without it, not blanked — see core/views_executive.py.
+{% endcomment %}
+
+{% block crumb %}Dashboard{% endblock %}
+{% block title %}Dashboard · Livo OS{% endblock %}
+
+{% block content %}
+<div class="page-head exec-head">
+  <div>
+    <h2>Executive dashboard</h2>
+    <p>Here's what's happening across your business today.</p>
+    <div class="exec-meta">
+      <span class="em-chip live">
+        <span class="dot" aria-hidden="true"></span>
+        Live workspace · {% if workspace_is_all %}All workspaces{% else %}{{ active_workspace.name|default:"Livo Digital" }}{% endif %}
+      </span>
+      <span class="em-chip">Data refreshed {{ generated_at|date:"H:i" }}</span>
+      <span class="em-chip">
+        {% if user.is_superuser %}Super Admin{% else %}{{ user.primary_role|default:"Your" }}{% endif %} view ·
+        {{ start|date:"d M Y" }} – {{ end|date:"d M Y" }}
+      </span>
+    </div>
+  </div>
+  <div class="head-actions">
+    <a class="btn sm ghost" href="{% url 'analytics:dashboard' %}">Analytics</a>
+    {% if can_view_money %}
+    <a class="btn sm ghost" href="{% url 'core:business' %}">Business</a>
+    {% endif %}
+  </div>
+</div>
+
+<form method="get" class="filter-bar" style="margin-bottom:18px">
+  <label class="fb-field"><span>From</span>
+    <input type="date" name="start" value="{{ start|date:'Y-m-d' }}"></label>
+  <label class="fb-field"><span>To</span>
+    <input type="date" name="end" value="{{ end|date:'Y-m-d' }}"></label>
+  <button class="btn sm" type="submit">Apply</button>
+</form>
+
+{# ---- headline tiles ----------------------------------------------------- #}
+<div class="exec-tiles">
+  {% for tile in tiles %}
+  <div class="exec-tile{% if tile.band %} band-{{ tile.band }}{% endif %}">
+    <div class="t-top">
+      <span class="t-label">{{ tile.label }}</span>
+      {% if tile.delta %}
+      {% comment %}
+      The arrow is absent, not zero, when there is nothing to compare against.
+      A first period showing "+100%" is a number somebody repeats out loud.
+      {% endcomment %}
+      <span class="t-delta d-{{ tile.delta.direction }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          {% if tile.delta.direction == 'up' %}<polyline points="4 16 10 10 14 14 20 8"/><polyline points="20 13 20 8 15 8"/>
+          {% elif tile.delta.direction == 'down' %}<polyline points="4 8 10 14 14 10 20 16"/><polyline points="20 11 20 16 15 16"/>
+          {% else %}<line x1="5" y1="12" x2="19" y2="12"/>{% endif %}
+        </svg>
+        {{ tile.delta.percent }}%
+      </span>
+      {% endif %}
+    </div>
+    <div class="t-value">
+      {% if tile.kind == "money" %}₹{{ tile.value|floatformat:"0g" }}
+      {% elif tile.kind == "score" %}{% if tile.value == None %}—{% else %}{{ tile.value }}<span class="t-unit">/100</span>{% endif %}
+      {% else %}{{ tile.value }}{% endif %}
+    </div>
+    <div class="t-note">{{ tile.note }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+{# ---- operational strip -------------------------------------------------- #}
+<div class="exec-strip">
+  {% for s in stats %}
+  <div class="strip-stat{% if s.tone == 'warn' %} tone-warn{% endif %}">
+    <div class="ss-label">{{ s.label }}</div>
+    <div class="ss-value">{{ s.value }}</div>
+    <div class="ss-note">{{ s.note }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+{# ---- AI business brief -------------------------------------------------- #}
+<section class="ai-brief" aria-labelledby="ai-brief-h">
+  <div class="ab-head">
+    <div class="ab-mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>
+        <circle cx="12" cy="12" r="3.2"/>
+      </svg>
+    </div>
+    <div class="ab-title">
+      <h3 id="ai-brief-h">AI business brief <span class="ab-badge" data-brief-state>Generating…</span></h3>
+      <p>Your business snapshot · {{ generated_at|date:"d M Y, H:i" }}</p>
+    </div>
+    <div class="ab-scope">Read {{ record_count }} record{{ record_count|pluralize }} across the modules you can see</div>
+  </div>
+
+  <p class="ab-lede" data-brief-text aria-live="polite">Reading this period's figures…</p>
+
+  {% comment %}
+  The chips are the ARITHMETIC brief, not the model's. They render instantly
+  from the database and are still correct when Groq is down, rate-limited or
+  having an imaginative day — which is why they, and not the paragraph above,
+  are the part carrying the actual counts.
+  {% endcomment %}
+  <div class="ab-facts">
+    {% for line in brief %}
+    <div class="ab-fact"><span class="dot" aria-hidden="true"></span>{{ line }}</div>
+    {% endfor %}
+  </div>
+
+  {% if actions %}
+  <div class="ab-actions-label">Recommended actions</div>
+  <div class="ab-actions">
+    {% for a in actions %}
+    <a class="ab-action level-{{ a.level }}" href="{% url a.route %}">
+      <span class="aa-index">{{ a.index }}</span>
+      <span class="aa-body">
+        <span class="aa-title">{{ a.title }}</span>
+        <span class="aa-text">{{ a.body }}</span>
+        <span class="aa-metric">{{ a.metric }}</span>
+      </span>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <p class="ab-foot">
+    The chips and actions above are counted from the database. The opening
+    paragraph is written by a model from those same figures — it interprets
+    them, it does not produce them.
+  </p>
+</section>
+
+{# ---- how the health score was reached ----------------------------------- #}
+{% if health.score != None %}
+<div class="card exec-health">
+  <div class="card-h">
+    <h3>How the {{ health.score }} was reached</h3>
+    <span class="hint">Weighted across the areas we have data for</span>
+  </div>
+  <div class="card-b">
+    <div class="health-parts">
+      {% for c in health.components %}
+      <div class="health-part{% if c.score == None %} unscored{% endif %}">
+        <div class="hp-top">
+          <span class="hp-label">{{ c.label }}</span>
+          <span class="hp-score band-{{ c.band }}">
+            {% if c.score == None %}not scored{% else %}{{ c.score|floatformat:"0" }}{% endif %}
+          </span>
+        </div>
+        <div class="hp-track" role="img"
+             aria-label="{{ c.label }}: {% if c.score == None %}not scored{% else %}{{ c.score|floatformat:'0' }} out of 100{% endif %}">
+          <span class="hp-fill band-{{ c.band }}" style="width:{{ c.score|default:0 }}%"></span>
+        </div>
+        <div class="hp-note">{{ c.note }}</div>
+        {% if c.contribution != None %}
+        <div class="hp-weight">Contributes {{ c.contribution }} of the total · weight {{ c.weight }}</div>
+        {% else %}
+        <div class="hp-weight">No data on this axis — its weight is shared by the rest</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ---- charts: money ------------------------------------------------------ #}
+{% if can_view_money %}
+<div class="exec-row wide-first">
+  {% include "analytics/_chart_card.html" with chart_id="revenue-trend" title="Revenue performance" caption="Payments received per month across this period." height=300 empty="No payments received in this range." %}
+  {% include "analytics/_chart_card.html" with chart_id="pipeline-stages" title="Sales pipeline" caption="Budget value at each stage. The count is in the label, so one large project is never mistaken for several." height=300 empty="No projects with a budget recorded." %}
+</div>
+{% endif %}
+
+{# ---- charts: delivery, people, customers -------------------------------- #}
+<div class="exec-row three">
+  {% include "analytics/_chart_card.html" with chart_id="task-flow" title="Task flow" caption="Created against completed each week, with the running net movement behind them." empty="No tasks created or completed in this range." %}
+  {% include "analytics/_chart_card.html" with chart_id="department-scorecard" title="Department performance" caption="Scored on distance from the target utilisation band, in both directions." empty="Every department scored zero for this period - the scorecards below show why." %}
+  {% include "analytics/_chart_card.html" with chart_id="client-health" title="Customer health" caption="Accounts by band — engagement and, where visible, payment behaviour." empty="No clients yet." %}
+</div>
+
+{# ---- alerts ------------------------------------------------------------- #}
+<div class="section-head">
+  <div>
+    <h3>Business health &amp; alerts</h3>
+    <p>Risks detected across delivery, commercial and people signals</p>
+  </div>
+  <a class="btn sm ghost" href="{% url 'analytics:dashboard' %}">Analytics</a>
+</div>
+<div class="alert-grid">
+  {% for a in alerts %}
+  <div class="alert-row level-{{ a.level }}">
+    <div class="a-head">
+      <span class="a-level">{{ a.level }}</span>
+      <span class="tag gray">{{ a.module }}</span>
+    </div>
+    <div class="a-title">{{ a.title }}</div>
+    <p class="a-body">{{ a.body }}</p>
+    <div class="a-foot">
+      <span class="a-metric">{{ a.metric }}</span>
+      <a class="btn sm ghost" href="{% url a.route %}">Open module</a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{# ---- people + brief ----------------------------------------------------- #}
+<div class="exec-row wide-first">
+  {% include "analytics/_chart_card.html" with chart_id="employee-health" title="Employee health" caption="Utilisation against capacity, and how much of it was billable, month by month." height=300 empty="No hours logged in this range." %}
+  <div class="card">
+    <div class="card-h">
+      <h3>Daily management brief</h3>
+      <span class="tag gray">{{ brief|length }} item{{ brief|length|pluralize }}</span>
+    </div>
+    <div class="card-b">
+      <ul class="brief-list">
+        {% for line in brief %}<li>{{ line }}</li>{% endfor %}
+      </ul>
+      <p class="hint">Counted directly from the database for this period.</p>
+    </div>
+  </div>
+</div>
+
+{# ---- watchlist ---------------------------------------------------------- #}
+<div class="exec-tables">
+  <div class="card">
+    <div class="card-h">
+      <h3>Project watchlist</h3>
+      <span class="hint">Lowest health first</span>
+    </div>
+    <div class="card-b">
+      {% if watchlist %}
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Project</th><th>Client</th>
+              <th class="num">Health</th><th>Risk</th><th class="num">Overdue</th>
+              {% if can_view_money %}<th class="num">Outstanding</th>{% endif %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in watchlist %}
+            <tr>
+              <td><a href="{{ row.project.get_absolute_url }}">{{ row.project.name }}</a></td>
+              <td>{{ row.client.name }}</td>
+              <td class="num"><span class="score-chip" data-score="{{ row.health }}">{{ row.health }}</span></td>
+              <td><span class="risk risk-{{ row.risk.level|lower }}">{{ row.risk.level|title }}</span>
+                {% if row.risk.reasons %}<span class="risk-why">{{ row.risk.reasons|join:", " }}</span>{% endif %}</td>
+              <td class="num">{{ row.overdue_tasks }}</td>
+              {% if can_view_money %}<td class="num">₹{{ row.outstanding|floatformat:"0g" }}</td>{% endif %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="hint">No projects in this workspace yet.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-h">
+      <h3>Top accounts</h3>
+      <span class="hint">By {% if can_view_money %}revenue{% else %}hours{% endif %}</span>
+    </div>
+    <div class="card-b">
+      {% if top_clients %}
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Client</th><th class="num">Live</th><th class="num">Hours</th>
+              {% if can_view_money %}<th class="num">Revenue</th>{% endif %}
+              <th class="num">Health</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in top_clients %}
+            <tr>
+              <td><a href="{{ row.client.get_absolute_url }}">{{ row.client.name }}</a></td>
+              <td class="num">{{ row.active_projects }}</td>
+              <td class="num">{{ row.hours|floatformat:"0" }}</td>
+              {% if can_view_money %}<td class="num">₹{{ row.revenue|floatformat:"0g" }}</td>{% endif %}
+              <td class="num"><span class="score-chip" data-score="{{ row.health }}">{{ row.health }}</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="hint">No clients in this workspace yet.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{# ---- department scorecards ---------------------------------------------- #}
+{% if scorecards %}
+<div class="section-head">
+  <div>
+    <h3>Department scorecards</h3>
+    <p>Performance, workload and risk posture across the organisation</p>
+  </div>
+  <a class="btn sm ghost" href="{% url 'analytics:employees' %}">Full breakdown</a>
+</div>
+<div class="scorecards">
+  {% for d in scorecards %}
+  <div class="scorecard band-{{ d.band }}">
+    <div class="sc-head">
+      <div>
+        <div class="sc-name">{{ d.department.name }}</div>
+        <div class="sc-people">{{ d.headcount }} {% if d.headcount == 1 %}person{% else %}people{% endif %}</div>
+      </div>
+      <span class="sc-score">{{ d.score }}</span>
+    </div>
+    <div class="sc-metric">
+      <div class="scm-top"><span>Utilisation</span><span>{{ d.utilization_percent|floatformat:"0" }}%</span></div>
+      {% comment %}
+      Capped at 100 for the BAR only — the number beside it is uncapped, so an
+      overloaded department reads as a full bar next to "134%" rather than
+      having the overload quietly rescaled out of sight.
+      {% endcomment %}
+      <div class="scm-track"><span class="scm-fill" style="width:{% if d.utilization_percent > 100 %}100{% else %}{{ d.utilization_percent|floatformat:'0' }}{% endif %}%"></span></div>
+    </div>
+    <div class="sc-metric">
+      <div class="scm-top"><span>Billable</span><span>{{ d.billable_percent|floatformat:"0" }}%</span></div>
+      <div class="scm-track"><span class="scm-fill alt" style="width:{{ d.billable_percent|floatformat:'0' }}%"></span></div>
+    </div>
+    <div class="sc-foot">
+      <span>{{ d.hours|floatformat:"0" }} h logged</span>
+      <span>{{ d.tasks_completed }} task{{ d.tasks_completed|pluralize }} done</span>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ---- what this install does not track ----------------------------------- #}
+<div class="card exec-gaps">
+  <div class="card-h"><h3>Not tracked in this install</h3></div>
+  <div class="card-b">
+    <p class="hint">These are common on an executive dashboard and are absent
+      here because no module records them — support tickets and SLA compliance,
+      AMC/renewal contracts, inventory and stock levels, CSAT or NPS responses,
+      and engagement-survey scores. Nothing above estimates or stands in for
+      them.</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ charts|json_script:"chart-configs" }}
+<script src="{% static 'js/chart.umd.js' %}"></script>
+<script src="{% static 'js/charts.js' %}"></script>
+<script>
+// Health chips coloured from their own value, so the template does not carry
+// the band cut-offs in three branches. Must match analytics/executive.py.
+(function () {
+  document.querySelectorAll(".score-chip[data-score]").forEach(function (el) {
+    var n = Number(el.dataset.score);
+    el.classList.add("band-" + (n >= 70 ? "healthy" : n >= 45 ? "monitor" : "risk"));
+  });
+})();
+
+// The AI paragraph, fetched after render. Every failure path lands on the same
+// quiet sentence: this is an extra, and it is never allowed to make the front
+// page of the company look broken.
+(function () {
+  var text = document.querySelector("[data-brief-text]");
+  var state = document.querySelector("[data-brief-state]");
+  if (!text) return;
+
+  function settle(message, label) {
+    text.textContent = message;
+    if (state) state.textContent = label;
+  }
+
+  fetch("{% url 'core:executive_brief' %}?start={{ start|date:'Y-m-d' }}&end={{ end|date:'Y-m-d' }}", {
+    headers: { "X-Requested-With": "XMLHttpRequest" },
+    credentials: "same-origin"
+  })
+    .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+    .then(function (data) {
+      if (data && data.text) {
+        settle(data.text, data.cached ? "Cached" : "Generated");
+      } else {
+        settle("No AI summary available for this period. Every figure below is unaffected.",
+               "Unavailable");
+      }
+    })
+    .catch(function () {
+      settle("Could not reach the AI service. Every figure below is unaffected.",
+             "Unavailable");
+    });
+})();
+</script>
+{% endblock %}

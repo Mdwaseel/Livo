@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% load static client_calendar_tags %}
+{% block title %}Client approvals · Livo OS{% endblock %}
+{% block head %}<link rel="stylesheet" href="{% static 'css/client_calendar.css' %}"><link rel="stylesheet" href="{% static 'css/client_review.css' %}">{% endblock %}
+{% block crumb %}<a href="{% url 'client_calendar:index' %}">Client calendars</a> / Approvals{% endblock %}
+
+{% block content %}
+<div class="cc ap-page">
+<div class="page-head">
+  <div>
+    <h2>Client approvals</h2>
+    <p>Work sent to clients for sign-off. They answer from a private link in their email, and you're notified the moment they do.{% if counts.overdue %} <strong class="ap-late">{{ counts.overdue }} overdue.</strong>{% endif %}</p>
+  </div>
+  {% if clients|length > 1 %}
+  <form method="get" class="page-actions ap-filter">
+    <input type="hidden" name="tab" value="{{ tab }}">
+    <label class="cc-sr" for="ap-client">Client</label>
+    <select id="ap-client" name="client" onchange="this.form.submit()">
+      <option value="">All clients</option>
+      {% for option in clients %}<option value="{{ option.pk }}"{% if client_id == option.pk|stringformat:'s' %} selected{% endif %}>{{ option.name }}</option>{% endfor %}
+    </select>
+    <noscript><button class="btn sm ghost" type="submit">Show</button></noscript>
+  </form>
+  {% endif %}
+</div>
+
+<nav class="ap-tabs" aria-label="Approval status">
+  {% for key, label, count in tabs %}
+  <a class="ap-tab{% if tab == key %} is-on{% endif %}" href="?tab={{ key }}{% if client_id %}&amp;client={{ client_id }}{% endif %}"{% if tab == key %} aria-current="page"{% endif %}>{{ label }}{% if count is not None %}<span>{{ count }}</span>{% endif %}</a>
+  {% endfor %}
+</nav>
+
+{% if rows %}
+<div class="card ap-list">
+  {% for row in rows %}{% with a=row.activity %}
+  <a class="ap-row" href="{{ row.get_absolute_url }}">
+    <span class="ap-row-ico fam-{{ a.family }}" aria-hidden="true">{% cc_icon a.kind_icon %}</span>
+    <span class="ap-row-main">
+      <span class="ap-row-title">{{ a.title }}{% if row.version > 1 %} <span class="ap-v">v{{ row.version }}</span>{% endif %}</span>
+      <span class="ap-row-meta">{{ a.project.client.name }} · {{ a.short_kind }} · planned {{ a.date|date:"D j M" }}</span>
+    </span>
+    <span class="ap-row-who">
+      {% if row.is_pending %}
+        {% for r in row.recipients.all %}<span class="ap-person{% if r.first_opened_at %} is-seen{% endif %}">{% if r.first_opened_at %}{% cc_icon "check" %}{% endif %}{{ r.reviewer.name }}<span class="cc-sr">{% if r.first_opened_at %} (opened){% else %} (not opened yet){% endif %}</span></span>{% endfor %}
+      {% elif row.decided_by %}{{ row.decided_by.name }} · {{ row.decided_at|date:"j M" }}{% endif %}
+    </span>
+    <span class="ap-row-state">
+      {% if row.is_pending and row.respond_by %}
+      <span class="tag {% if row.is_overdue %}danger{% else %}warn{% endif %}"><span class="dot"></span>{% if row.is_overdue %}Overdue · {{ row.respond_by|date:"j M" }}{% else %}Reply by {{ row.respond_by|date:"j M" }}{% endif %}</span>
+      {% else %}
+      <span class="tag {{ row.tone }}"><span class="dot"></span>{{ row.get_status_display }}</span>
+      {% endif %}
+    </span>
+  </a>
+  {% endwith %}{% endfor %}
+</div>
+{% else %}
+<div class="card"><div class="empty">
+  <h3>{% if tab == 'waiting' %}Nothing is waiting on a client{% elif tab == 'changes' %}No open change requests{% elif tab == 'approved' %}Nothing approved yet{% else %}No approval requests yet{% endif %}</h3>
+  <p>Open an activity on a client calendar and choose “Ask for approval” to send the copy, images or links for sign-off.</p>
+  <p style="margin-top:14px"><a class="btn soft sm" href="{% url 'client_calendar:index' %}">Go to client calendars</a></p>
+</div></div>
+{% endif %}
+</div>
+{% endblock %}

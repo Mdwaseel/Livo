@@ -1,0 +1,65 @@
+{% extends "accounts/auth_base.html" %}
+
+{% block title %}Verify it's you{% endblock %}
+{% block subtitle %}
+  Enter the code below to finish signing in. It expires in {{ minutes }} minutes.
+{% endblock %}
+
+{% block card %}
+<form method="post" novalidate>
+  {% csrf_token %}
+  {% if error %}<div class="err">{{ error }}</div>{% endif %}
+
+  {% if display_code %}
+  <div class="otp-display" aria-live="polite">
+    <span class="otp-display-label">Your sign-in code</span>
+    <span class="otp-display-code">{{ display_code }}</span>
+  </div>
+  {% else %}
+  <div class="note">This code is no longer valid. Get a new one below.</div>
+  {% endif %}
+
+  <label for="{{ form.code.id_for_label }}">Verification code</label>
+  {{ form.code }}
+
+  <button type="submit">Verify &amp; sign in</button>
+</form>
+
+{% comment %}
+Separate form: nesting it inside the one above is invalid HTML and the browser
+would fire the wrong action.
+{% endcomment %}
+<form method="post" action="{% url 'accounts:login_otp_resend' %}" class="auth-inline">
+  {% csrf_token %}
+  <button type="submit" class="linkish" id="resend"
+          {% if resend_in %}disabled{% endif %}>
+    {% if resend_in %}New code in {{ resend_in }}s{% else %}Get a new code{% endif %}
+  </button>
+</form>
+
+<p class="auth-foot">
+  Not you? <a href="{% url 'accounts:login' %}">Cancel and start over</a>.
+</p>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Count the cooldown down in place so the button re-enables itself without a
+// page reload; the server enforces the same window regardless.
+(function () {
+  var button = document.getElementById("resend");
+  var left = {{ resend_in|default:0 }};
+  if (!button || left <= 0) return;
+  var tick = setInterval(function () {
+    left -= 1;
+    if (left <= 0) {
+      clearInterval(tick);
+      button.disabled = false;
+      button.textContent = "Get a new code";
+    } else {
+      button.textContent = "New code in " + left + "s";
+    }
+  }, 1000);
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% load rbac_tags %}
+{% block crumb %}<a href="{% url 'clients:list' %}">Clients</a> / {{ client.name }}{% endblock %}
+{% block content %}
+{% user_can user 'projects' 'create' as can_add_project %}
+{% user_can user 'clients' 'delete' as can_del_client %}
+<div class="page-head">
+  <div><h2>{{ client.name }}</h2>
+    <p>{{ client.city|default:"" }}{% if client.gstin %} · GSTIN {{ client.gstin }}{% endif %}</p></div>
+  <div style="display:flex;gap:10px;align-items:center">
+    {% if can.clients %}
+    <a href="{% url 'clients:edit' client.pk %}" class="btn ghost">Edit client</a>
+    {% endif %}
+    {% if can_add_project %}
+    <a href="{% url 'projects:create' client.pk %}" class="btn">+ New project</a>
+    {% endif %}
+    {% if can_del_client %}
+    <form method="post" action="{% url 'clients:delete' client.pk %}"
+          onsubmit="return confirm('Delete “{{ client.name|escapejs }}”? Its projects and documents will be deleted too. This cannot be undone.')">
+      {% csrf_token %}<button type="submit" class="btn ghost" style="color:var(--danger)">Delete</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+<div class="grid-2">
+  <div>
+    <div class="divider">Projects &amp; documents</div>
+    {% for p in projects %}
+    <div class="acc{% if forloop.counter <= 2 %} open{% endif %}">
+      <button type="button" class="acc-h" aria-expanded="{% if forloop.counter <= 2 %}true{% else %}false{% endif %}" aria-controls="acc-body-{{ p.pk }}">
+        <svg class="acc-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        <span class="acc-name">{{ p.name }}
+          {% if p.is_default %} <span class="tag gray">default</span>{% endif %}</span>
+        <span class="acc-meta">
+          {% with ob=p.onboarding_progress %}{% if ob.total %}<span class="tag {% if ob.done == ob.total %}ok{% else %}gray{% endif %}" title="Onboarding progress">{{ ob.done }}/{{ ob.total }}</span>{% endif %}{% endwith %}
+          <span class="tag gray">{{ p.visible_documents|length }} doc{{ p.visible_documents|length|pluralize }}</span>
+          <span class="tag {% if p.status == 'ACTIVE' %}ok{% elif p.status == 'ON_HOLD' %}warn{% elif p.status == 'CANCELLED' %}danger{% else %}gray{% endif %}">{{ p.get_status_display }}</span>
+        </span>
+      </button>
+      <div class="acc-b" id="acc-body-{{ p.pk }}">
+        <div class="acc-inner">
+          {% if p.visible_documents %}
+          <table>
+            <thead><tr><th>Document</th><th>Type</th><th>Status</th><th>Version</th></tr></thead>
+            <tbody>
+            {% for d in p.visible_documents %}
+              <tr>
+                <td><a href="{{ d.get_absolute_url }}"><strong>{{ d.title }}</strong></a>
+                  {% if d.number %} <span class="num">{{ d.number }}</span>{% endif %}</td>
+                <td style="color:var(--ink-soft)">{{ d.document_type.name }}</td>
+                <td><span class="tag {% if d.status == 'APPROVED' %}ok{% elif d.status == 'SENT' %}info{% elif d.status == 'REVIEW' %}warn{% else %}gray{% endif %}">{{ d.get_status_display }}</span></td>
+                <td style="color:var(--ink-soft)">{% if d.current_version %}v{{ d.current_version.version_number }}{% else %}—{% endif %}</td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div class="empty" style="padding:20px"><h3>No documents yet</h3></div>
+          {% endif %}
+          <div class="acc-foot">
+            <a href="{{ p.get_absolute_url }}">Open project →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% empty %}
+    <div class="card"><div class="empty"><h3>No projects</h3>
+      <p>Create this client's first project to start generating documents.</p></div></div>
+    {% endfor %}
+  </div>
+  <div style="align-self:start">
+  {% if can_view_finance %}
+  <div class="card" style="margin-bottom:18px">
+    <div class="card-h"><h3>Finances</h3></div>
+    <div class="card-b" style="padding:14px 20px">
+      <table class="finfo"><tbody>
+        <tr><td>Total value</td><td style="text-align:right;font-family:var(--mono)"><strong>{% if client.total_value %}₹{{ client.total_value|floatformat:"0g" }}{% else %}—{% endif %}</strong></td></tr>
+        <tr><td>Received</td><td style="text-align:right;font-family:var(--mono)"><strong>₹{{ client.total_received|floatformat:"0g" }}</strong></td></tr>
+        <tr><td>Outstanding</td><td style="text-align:right;font-family:var(--mono)"><strong {% if client.outstanding > 0 %}style="color:var(--warn)"{% endif %}>₹{{ client.outstanding|floatformat:"0g" }}</strong></td></tr>
+      </tbody></table>
+    </div>
+  </div>
+  {% endif %}
+  {% user_can user 'projects' 'view' as can_client_calendar %}
+  {% if can_client_calendar and projects %}
+  <div class="card" style="margin-bottom:18px">
+    <div class="card-h"><h3>Client calendar</h3>
+      {% if calendar_link and calendar_link.is_active %}<span class="tag ok"><span class="dot"></span>Shared</span>{% elif calendar_link %}<span class="tag gray">Link off</span>{% else %}<span class="tag gray">Not shared</span>{% endif %}</div>
+    <div class="card-b" style="padding:14px 20px">
+      <p style="color:var(--ink-soft);font-size:13px;margin-bottom:12px">Posts, stories, ad changes and reports on a private link the client can open any time.</p>
+      <a class="btn sm" href="{% url 'client_calendar:planner' client.pk %}">Open calendar &rarr;</a>
+    </div>
+  </div>
+  {% endif %}
+  <div class="card">
+    <div class="card-h"><h3>Contacts</h3></div><div class="card-b">
+    {% for ct in contacts %}
+      <div style="padding:8px 0;border-bottom:1px solid var(--line-2)">
+        <strong>{{ ct.name }}</strong>{% if ct.is_primary %} <span class="tag">primary</span>{% endif %}
+        <div style="color:var(--ink-soft);font-size:12.5px">{{ ct.designation }}{% if ct.email %} · {{ ct.email }}{% endif %}</div>
+      </div>
+    {% empty %}<p style="color:var(--ink-soft)">No contacts added.</p>{% endfor %}
+    </div>
+  </div>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll(".acc-h").forEach(function (btn) {
+  btn.addEventListener("click", function () {
+    var acc = btn.closest(".acc");
+    var open = acc.classList.toggle("open");
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+});
+</script>
+{% endblock %}

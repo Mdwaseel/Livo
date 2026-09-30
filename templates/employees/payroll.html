@@ -1,0 +1,333 @@
+{% extends "base.html" %}
+{% block crumb %}Payroll{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Payroll · {{ month|date:"F Y" }}</h2>
+    <p>Salary less any leave beyond the allowance, and a record of how each
+       person was actually paid.</p>
+  </div>
+  <form method="get" class="pr-month">
+    <label for="pr-month" class="inl-l">Month</label>
+    <input id="pr-month" type="month" name="month" value="{{ month_input }}"
+           onchange="this.form.submit()">
+    <noscript><button class="btn ghost sm" type="submit">Go</button></noscript>
+  </form>
+</div>
+
+{% if can_run %}
+<form method="post" action="{% url 'employees:payroll_generate' %}" class="pr-run">
+  {% csrf_token %}
+  <input type="hidden" name="month" value="{{ month_input }}">
+  <button class="btn" type="submit">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3.2-6.9"/><polyline points="21 3 21 9 15 9"/></svg>
+    {% if records %}Recalculate {{ month|date:"F" }}{% else %}Generate {{ month|date:"F" }}{% endif %}
+  </button>
+  {% comment %}
+  Said plainly beside the button, because "recalculate" is the word people fear
+  on a payroll screen: a month already paid is history and is never rewritten,
+  and a bonus typed in by hand survives a rerun.
+  {% endcomment %}
+  <span class="hint">Rows already marked paid are left untouched. Manual
+    adjustments are kept.</span>
+</form>
+{% endif %}
+
+{% if missing %}
+<div class="banner">
+  <span>{{ missing|length }} employee{{ missing|pluralize }} ha{{ missing|pluralize:"s,ve" }}
+    no row for {{ month|date:"F" }} yet{% if can_run %} — generate to add them{% endif %}.</span>
+</div>
+{% endif %}
+
+{% comment %}
+The month's answer before the month's arithmetic. "How much is still owed" is
+the question this screen is opened with, and until now it could only be found
+by reading to the bottom of a table that is mostly forms.
+{% endcomment %}
+{% if records %}
+<div class="pr-summary">
+  <div class="pr-stat">
+    <span>Net payable</span>
+    <b>₹{{ totals.net|floatformat:0 }}</b>
+    <small>{{ records|length }} employee{{ records|length|pluralize }}</small>
+  </div>
+  <div class="pr-stat is-paid">
+    <span>Paid</span>
+    <b>₹{{ totals.paid|floatformat:0 }}</b>
+    <small>{{ paid_count }} of {{ records|length }} settled</small>
+  </div>
+  <div class="pr-stat {% if totals.outstanding %}is-due{% endif %}">
+    <span>Outstanding</span>
+    <b>₹{{ totals.outstanding|floatformat:0 }}</b>
+    <small>{% if totals.outstanding %}still to pay{% else %}nothing left to pay{% endif %}</small>
+  </div>
+  <div class="pr-stat">
+    <span>Leave deducted</span>
+    <b>−₹{{ totals.deduction|floatformat:0 }}</b>
+    <small>beyond the allowance</small>
+  </div>
+</div>
+<div class="pr-progress" role="img"
+     aria-label="₹{{ totals.paid|floatformat:0 }} of ₹{{ totals.net|floatformat:0 }} paid">
+  <span style="width:{% widthratio totals.paid totals.net 100 %}%"></span>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="table-wrap">
+    <table class="table pr-table">
+      <thead>
+        <tr>
+          <th>Employee</th>
+          <th class="ta-r">Gross</th>
+          <th>Leave</th>
+          <th class="ta-r">Deduction</th>
+          <th class="ta-r">Adjustment</th>
+          <th class="ta-r">Net&nbsp;payable</th>
+          <th class="ta-r">Payment</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in records %}
+        <tr class="pr-row{% if r.is_paid %} is-paid{% endif %}"
+            data-gross="{{ r.gross|stringformat:'s' }}"
+            data-deduction="{{ r.leave_deduction|stringformat:'s' }}">
+          <td>
+            <strong>{{ r.employee.display_name }}</strong>
+            <div class="hint">{{ r.employee.user.department.name|default:"—" }}</div>
+          </td>
+          <td class="ta-r pr-num">
+            {% if r.gross %}₹{{ r.gross|floatformat:0 }}
+            {% else %}<span class="pill pill-off">No salary set</span>{% endif %}
+          </td>
+          <td class="pr-leave">
+            {% if r.leave_days_taken %}
+              {{ r.leave_days_taken|floatformat:"-1" }} day{{ r.leave_days_taken|pluralize }}
+            {% else %}
+              <span class="hint">None</span>
+            {% endif %}
+            {% if r.excess_leave_days %}
+            <div><span class="pill pill-over">{{ r.excess_leave_days|floatformat:"-1" }} over</span></div>
+            {% endif %}
+            {% if r.unpaid_leave_days %}
+            <div><span class="pill pill-over">{{ r.unpaid_leave_days|floatformat:"-1" }} unpaid</span></div>
+            {% endif %}
+          </td>
+          <td class="ta-r pr-num">
+            {% if r.leave_deduction %}<span class="pr-minus">−₹{{ r.leave_deduction|floatformat:0 }}</span>
+            {% else %}<span class="pr-dash">—</span>{% endif %}
+          </td>
+          <td class="ta-r pr-num">
+            {% if r.adjustment %}
+              <span class="{% if r.adjustment > 0 %}pr-plus{% else %}pr-minus{% endif %}">
+                {% if r.adjustment > 0 %}+{% endif %}₹{{ r.adjustment|floatformat:0 }}</span>
+              {% if r.adjustment_note %}<div class="hint pr-note">{{ r.adjustment_note }}</div>{% endif %}
+            {% else %}<span class="pr-dash">—</span>{% endif %}
+          </td>
+          <td class="ta-r pr-num pr-net"><strong>₹{{ r.net_payable|floatformat:0 }}</strong></td>
+          <td class="ta-r">
+            {% if r.is_paid %}
+              <span class="pill pill-available">Paid {{ r.paid_on|date:"d M" }}</span>
+              <div class="hint">{{ r.get_mode_display }}{% if r.reference %} · {{ r.reference }}{% endif %}</div>
+            {% elif can_run %}
+              {% comment %}
+              One button instead of six controls per row. The payment fields and
+              the adjustment box were both permanently open on every unpaid row,
+              which doubled the height of the table and put four inputs between
+              a name and the amount beside it. They open on the row you are
+              actually working on, and nowhere else.
+              {% endcomment %}
+              <button type="button" class="btn ghost sm pr-toggle"
+                      aria-expanded="false" aria-controls="pr-drawer-{{ r.pk }}">
+                <span class="pr-toggle-l">Settle</span>
+                <svg class="pr-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+            {% else %}
+              <span class="pill pill-near">Pending</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% if can_run and not r.is_paid %}
+        <tr class="pr-drawer" id="pr-drawer-{{ r.pk }}" hidden>
+          <td colspan="7">
+            <div class="pr-panels">
+              <form method="post" action="{% url 'employees:salary_pay' r.pk %}"
+                    class="pr-panel">
+                {% csrf_token %}
+                <h4>Record payment
+                  <em>{{ r.employee.display_name }} · ₹{{ r.net_payable|floatformat:0 }}</em></h4>
+                <div class="pr-fields">
+                  <label class="pr-f">
+                    <span>Date paid</span>
+                    <input type="date" name="paid_on" value="{{ today|date:'Y-m-d' }}" required>
+                  </label>
+                  <label class="pr-f">
+                    <span>Method</span>
+                    {% comment %}
+                    `required` rather than only the server check: picking a
+                    method is the one thing that can bounce this form, and
+                    finding that out after a round trip loses the date and the
+                    reference already typed.
+                    {% endcomment %}
+                    <select name="mode" required>
+                      <option value="">Choose…</option>
+                      {% for value, label in modes %}
+                      <option value="{{ value }}">{{ label }}</option>
+                      {% endfor %}
+                    </select>
+                  </label>
+                  <label class="pr-f pr-f-wide">
+                    <span>Reference <i>optional</i></span>
+                    <input name="reference" placeholder="UTR, cheque no., transaction id"
+                           maxlength="120">
+                  </label>
+                </div>
+                <div class="pr-panel-foot">
+                  <button class="btn sm" type="submit">Mark paid</button>
+                  <span class="hint">Recording a payment closes this month for
+                    {{ r.employee.display_name }}.</span>
+                </div>
+              </form>
+
+              <form method="post" action="{% url 'employees:salary_adjust' r.pk %}"
+                    class="pr-panel pr-panel-alt">
+                {% csrf_token %}
+                <h4>Bonus or deduction</h4>
+                <div class="pr-fields">
+                  <label class="pr-f">
+                    <span>Amount</span>
+                    <span class="pr-amount">
+                      <i>₹</i>
+                      {% comment %}
+                      Blank rather than a pre-filled "0": every bonus started
+                      with selecting and deleting a zero that was never a value
+                      anybody typed. The placeholder still says what empty means.
+                      {% endcomment %}
+                      <input name="adjustment" inputmode="decimal"
+                             value="{% if r.adjustment %}{{ r.adjustment|floatformat:'-2' }}{% endif %}"
+                             placeholder="0" data-pr-adjust>
+                    </span>
+                  </label>
+                  <label class="pr-f pr-f-wide">
+                    <span>Reason</span>
+                    <input name="adjustment_note" value="{{ r.adjustment_note }}"
+                           placeholder="Bonus, advance recovery…" maxlength="200">
+                  </label>
+                </div>
+                <div class="pr-panel-foot">
+                  <button class="btn ghost sm" type="submit">Save adjustment</button>
+                  <span class="hint">Positive adds, negative deducts.
+                    <output class="pr-preview" aria-live="polite"></output></span>
+                </div>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endif %}
+        {% empty %}
+        <tr><td colspan="7" class="empty">
+          <h3>Nothing generated for {{ month|date:"F Y" }} yet</h3>
+          <p>{% if can_run %}Use “Generate {{ month|date:"F" }}” above to build this
+             month from everyone's salary and approved leave.{% else %}Payroll for
+             this month has not been run.{% endif %}</p>
+        </td></tr>
+        {% endfor %}
+      </tbody>
+      {% if records %}
+      <tfoot>
+        <tr>
+          <th>Total</th>
+          <th class="ta-r pr-num">₹{{ totals.gross|floatformat:0 }}</th>
+          <th></th>
+          <th class="ta-r pr-num">−₹{{ totals.deduction|floatformat:0 }}</th>
+          <th></th>
+          <th class="ta-r pr-num">₹{{ totals.net|floatformat:0 }}</th>
+          <th class="ta-r">
+            <div class="pr-foot-split">
+              <span class="pr-foot-ok">₹{{ totals.paid|floatformat:0 }} paid</span>
+              <span class="pr-foot-due">₹{{ totals.outstanding|floatformat:0 }} outstanding</span>
+            </div>
+          </th>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// The per-row drawer: payment and adjustment for one person, opened on demand.
+// One at a time — two open drawers in a table this wide stop you being able to
+// see which row either of them belongs to.
+(function () {
+  // Formatted exactly as the column beside it — a preview that groups its
+  // digits differently from the table reads as a different number.
+  var rupees = function (n) { return "₹" + String(Math.round(n)); };
+
+  function drawerFor(button) {
+    return document.getElementById(button.getAttribute("aria-controls"));
+  }
+
+  function setOpen(button, open) {
+    var drawer = drawerFor(button);
+    if (!drawer) return;
+    drawer.hidden = !open;
+    button.setAttribute("aria-expanded", open ? "true" : "false");
+    button.classList.toggle("is-open", open);
+    button.querySelector(".pr-toggle-l").textContent = open ? "Close" : "Settle";
+    var row = button.closest("tr");
+    if (row) row.classList.toggle("is-open", open);
+  }
+
+  var toggles = Array.prototype.slice.call(document.querySelectorAll(".pr-toggle"));
+  toggles.forEach(function (button) {
+    button.addEventListener("click", function () {
+      var open = button.getAttribute("aria-expanded") === "true";
+      toggles.forEach(function (other) {
+        if (other !== button) setOpen(other, false);
+      });
+      setOpen(button, !open);
+      if (!open) {
+        var drawer = drawerFor(button);
+        var first = drawer && drawer.querySelector("input, select");
+        if (first) first.focus();
+      }
+    });
+  });
+
+  // Escape closes the drawer you are inside and puts focus back on its button,
+  // so the keyboard never ends up stranded in a panel that is no longer shown.
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "Escape") return;
+    var drawer = event.target.closest && event.target.closest(".pr-drawer");
+    if (!drawer) return;
+    var button = document.querySelector('[aria-controls="' + drawer.id + '"]');
+    if (button) { setOpen(button, false); button.focus(); }
+  });
+
+  // Typing a bonus shows what the person will actually be paid, before saving.
+  // The same arithmetic the server does — gross − leave deduction + adjustment,
+  // never below zero (SalaryRecord.recalculate).
+  document.querySelectorAll("[data-pr-adjust]").forEach(function (input) {
+    var drawer = input.closest(".pr-drawer");
+    var row = drawer && drawer.previousElementSibling;
+    var output = drawer && drawer.querySelector(".pr-preview");
+    if (!row || !output) return;
+
+    function preview() {
+      var gross = parseFloat(row.dataset.gross) || 0;
+      var deduction = parseFloat(row.dataset.deduction) || 0;
+      var adjustment = parseFloat(input.value);
+      if (isNaN(adjustment)) { output.textContent = ""; return; }
+      var net = Math.max(0, gross - deduction + adjustment);
+      output.textContent = "Net becomes " + rupees(net) + ".";
+    }
+    input.addEventListener("input", preview);
+  });
+})();
+</script>
+{% endblock %}

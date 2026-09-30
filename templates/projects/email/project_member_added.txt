@@ -1,0 +1,21 @@
+Hi {{ person.get_full_name|default:person.username }},
+
+{% if actor %}{{ actor.get_full_name|default:actor.username }} added you to a project.{% else %}You've been added to a project.{% endif %} You can now see it, its tasks, its files and its timeline in Livo OS.
+
+    {{ project.name }}
+
+Client:    {{ client.name|default:"—" }}
+Status:    {{ project.get_status_display }}
+{% if project.project_type %}Type:      {{ project.project_type }}
+{% endif %}{% if project.start_date %}Started:   {{ project.start_date|date:"D, d M Y" }}
+{% endif %}{% if project.target_end_date %}Target:    {{ project.target_end_date|date:"D, d M Y" }}
+{% endif %}{% if teammates %}Team:      {% for mate in teammates %}{{ mate.get_full_name|default:mate.username }}{% if not forloop.last %}, {% endif %}{% endfor %}
+{% endif %}{% if my_open_tasks %}
+{{ my_open_tasks }} open task{{ my_open_tasks|pluralize }} on this project {{ my_open_tasks|pluralize:"is,are" }} already assigned to you.
+{% endif %}{% if project.description %}
+{{ project.description }}
+{% endif %}{% if url %}
+Open the project:
+{{ url }}
+{% endif %}
+-- Livo OS

@@ -1,0 +1,60 @@
+{% extends "analytics/_base.html" %}
+
+{% block heading %}Project analytics{% endblock %}
+{% block lede %}Effort against estimate, delivery progress and risk, worst first.{% endblock %}
+
+{% block analytics %}
+{% comment %}
+This card used to be written out by hand, which meant it quietly missed
+whatever the shared partial gained — the empty state among it, so a range with
+no projects drew a 420px blank rectangle. Routed through the include instead.
+The branch is only here because the caption names one deduction that a reader
+without finance.view is not told about.
+{% endcomment %}
+{% if can_view_finance %}
+  {% include "analytics/_chart_card.html" with chart_id="project-health" title="Project health" height=420 caption="Health starts at 100 and deducts for a missed target date, effort over estimate, overdue tasks, and delivery running ahead of collection. The table below lists the same scores." empty="No projects with activity in this range." %}
+{% else %}
+  {% include "analytics/_chart_card.html" with chart_id="project-health" title="Project health" height=420 caption="Health starts at 100 and deducts for a missed target date, effort over estimate and overdue tasks. The table below lists the same scores." empty="No projects with activity in this range." %}
+{% endif %}
+
+<div class="card" style="margin-top:18px">
+  <div class="card-h"><h3>Per project</h3><span class="tag gray">{{ rows|length }}</span></div>
+  {% if rows %}
+  <div class="table-wrap"><table>
+    <thead><tr>
+      <th>Project</th>
+      <th title="Sum of task estimates">Est.</th>
+      <th title="Hours logged in range">Actual</th>
+      <th>Variance</th>
+      <th title="Tasks done as a share of all tasks">Completion</th>
+      <th>Milestones</th>
+      {% if can_view_finance %}<th>Budget</th><th>Outstanding</th>{% endif %}
+      <th>Risk</th><th style="text-align:right">Health</th>
+    </tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td><a href="{{ r.project.get_absolute_url }}"><strong>{{ r.project.name }}</strong></a><br>
+          <span class="cell-sub">{{ r.client.name }}</span></td>
+        <td>{{ r.estimated_hours|floatformat:"-2" }}</td>
+        <td>{{ r.actual_hours|floatformat:"-2" }}</td>
+        <td class="{% if r.hours_variance > 0 %}num-over{% endif %}">
+          {% if r.hours_variance > 0 %}+{% endif %}{{ r.hours_variance|floatformat:"-2" }}</td>
+        <td><span class="meter" aria-hidden="true"><i class="good" style="width:{{ r.completion_percent|floatformat:'0' }}%"></i></span>
+          {{ r.completion_percent|floatformat:"0" }}%</td>
+        <td>{{ r.milestones_done }}/{{ r.milestones_total }}</td>
+        {% if can_view_finance %}
+          <td>₹{{ r.budget|floatformat:"0g" }}</td>
+          <td class="{% if r.outstanding > 0 %}num-over{% endif %}">₹{{ r.outstanding|floatformat:"0g" }}</td>
+        {% endif %}
+        <td><span class="tag {% if r.risk.level == 'HIGH' %}danger{% elif r.risk.level == 'MEDIUM' %}warn{% else %}ok{% endif %}">{{ r.risk.level|title }}</span>
+          {% if r.risk.reasons %}<div class="cell-sub">{{ r.risk.reasons|join:" · " }}</div>{% endif %}</td>
+        <td style="text-align:right"><strong>{{ r.health }}</strong></td>
+      </tr>
+    {% endfor %}
+    </tbody></table></div>
+  {% else %}
+  <div class="empty"><h3>No projects match</h3><p>Try widening the filters.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

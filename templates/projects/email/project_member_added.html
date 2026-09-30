@@ -1,0 +1,85 @@
+{% comment %}
+Table layout and inline styles, matching projects/email/task_assigned.html: mail
+clients strip <style> blocks and have no flexbox, so anything smarter than this
+renders as a broken stack in Outlook.
+{% endcomment %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#131715;padding:32px 12px;font-family:Segoe UI,Helvetica,Arial,sans-serif">
+  <tr><td align="center">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#1b201e;border:1px solid #2e3833;border-radius:14px">
+      <tr><td style="padding:30px 32px 8px">
+        <div style="font-size:13px;letter-spacing:.18em;text-transform:uppercase;color:#17e381;font-weight:700">Livo OS</div>
+        <h1 style="margin:14px 0 6px;font-size:20px;color:#ffffff;font-weight:700">You're on a new project</h1>
+        <p style="margin:0;color:#a6aca9;font-size:14px;line-height:1.6">
+          Hi {{ person.get_full_name|default:person.username }},
+          {% if actor %}{{ actor.get_full_name|default:actor.username }} added you to the project below.{% else %}you've been added to the project below.{% endif %}
+          It's now visible to you along with its tasks, files and timeline.
+        </p>
+      </td></tr>
+
+      <tr><td style="padding:22px 32px 6px">
+        <div style="background:#131715;border:1px solid #36403b;border-radius:10px;padding:18px 20px">
+          <div style="font-size:17px;color:#ffffff;font-weight:700;line-height:1.4">{{ project.name }}</div>
+          {% if client %}
+          <div style="margin-top:3px;color:#848a87;font-size:12.5px">{{ client.name }}</div>
+          {% endif %}
+          {% if project.description %}
+          <p style="margin:9px 0 0;color:#a6aca9;font-size:13px;line-height:1.6">{{ project.description|truncatechars:320 }}</p>
+          {% endif %}
+        </div>
+      </td></tr>
+
+      <tr><td style="padding:14px 32px 6px">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:12.5px;color:#848a87">
+          <tr>
+            <td style="padding:4px 0">Status</td>
+            <td align="right" style="color:#cbcfcd">{{ project.get_status_display }}</td>
+          </tr>
+          {% if project.project_type %}
+          <tr>
+            <td style="padding:4px 0">Type</td>
+            <td align="right" style="color:#cbcfcd">{{ project.project_type }}</td>
+          </tr>
+          {% endif %}
+          {% if project.start_date %}
+          <tr>
+            <td style="padding:4px 0">Started</td>
+            <td align="right" style="color:#cbcfcd">{{ project.start_date|date:"D, d M Y" }}</td>
+          </tr>
+          {% endif %}
+          {% if project.target_end_date %}
+          <tr>
+            <td style="padding:4px 0">Target end</td>
+            <td align="right" style="color:#cbcfcd">{{ project.target_end_date|date:"D, d M Y" }}</td>
+          </tr>
+          {% endif %}
+          {% if teammates %}
+          <tr>
+            <td style="padding:4px 0;vertical-align:top">Team</td>
+            <td align="right" style="color:#cbcfcd;line-height:1.6">{% for mate in teammates %}{{ mate.get_full_name|default:mate.username }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
+          </tr>
+          {% endif %}
+        </table>
+      </td></tr>
+
+      {% if my_open_tasks %}
+      <tr><td style="padding:12px 32px 0">
+        <div style="background:#232b27;border:1px solid #36403b;border-radius:9px;padding:11px 14px;color:#cbcfcd;font-size:12.5px;line-height:1.55">
+          <strong style="color:#17e381">{{ my_open_tasks }} open task{{ my_open_tasks|pluralize }}</strong>
+          on this project {{ my_open_tasks|pluralize:"is,are" }} already assigned to you.
+        </div>
+      </td></tr>
+      {% endif %}
+
+      {% if url %}
+      <tr><td style="padding:20px 32px 30px">
+        <a href="{{ url }}" style="display:inline-block;background:#17e381;color:#131715;font-size:13.5px;font-weight:700;text-decoration:none;padding:11px 22px;border-radius:9px">Open the project</a>
+      </td></tr>
+      {% else %}
+      <tr><td style="padding:6px 32px 30px"></td></tr>
+      {% endif %}
+    </table>
+    <div style="max-width:520px;margin-top:14px;color:#626764;font-size:11.5px">
+      Sent automatically by Livo OS. Please don't reply to this address.
+    </div>
+  </td></tr>
+</table>

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block crumb %}<a href="{% url 'accounts:user_list' %}">Team</a> / {{ person.get_full_name|default:person.username }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h2>{{ person.get_full_name|default:person.username }}</h2>
+    <p>{{ person.email|default:person.username }}{% if person.is_superuser %} · <span class="tag ok">superuser — bypasses all checks</span>{% endif %}</p></div>
+</div>
+<form method="post" style="max-width:640px">
+  {% csrf_token %}
+  <div class="card"><div class="card-h"><h3>Roles</h3></div><div class="card-b">
+    <div class="field"><label>Primary role</label>
+      <select name="primary_role">
+        <option value="">— none —</option>
+        {% for r in roles %}<option value="{{ r.pk }}" {% if person.primary_role_id == r.pk %}selected{% endif %}>{{ r.name }}</option>{% endfor %}
+      </select></div>
+    <div class="field"><label>Extra roles (permissions are the union of all roles)</label>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;padding:6px 0">
+        {% for r in roles %}
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500">
+          <input type="checkbox" name="extra_roles" value="{{ r.pk }}"
+                 {% if r.pk in extra_role_ids %}checked{% endif %}> {{ r.name }}
+        </label>
+        {% endfor %}
+      </div></div>
+  </div></div>
+  <div class="card" style="margin-top:16px"><div class="card-h"><h3>Organisation</h3></div><div class="card-b">
+    <div class="row">
+      <div class="field"><label>Department</label>
+        <select name="department"><option value="">—</option>
+          {% for d in departments %}<option value="{{ d.pk }}" {% if person.department_id == d.pk %}selected{% endif %}>{{ d.name }}</option>{% endfor %}
+        </select></div>
+      <div class="field"><label>Designation</label>
+        <select name="designation"><option value="">—</option>
+          {% for g in designations %}<option value="{{ g.pk }}" {% if person.designation_id == g.pk %}selected{% endif %}>{{ g }}</option>{% endfor %}
+        </select></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Reports to</label>
+        <select name="reports_to"><option value="">—</option>
+          {% for m in managers %}<option value="{{ m.pk }}" {% if person.reports_to_id == m.pk %}selected{% endif %}>{{ m.get_full_name|default:m.username }}</option>{% endfor %}
+        </select></div>
+      <div class="field"><label>Employee code</label>
+        <input name="employee_code" value="{{ person.employee_code }}" placeholder="e.g. DV-007"></div>
+    </div>
+  </div></div>
+  <div style="margin-top:16px;display:flex;gap:10px">
+    <button class="btn" type="submit">Save</button>
+    <a href="{% url 'accounts:user_list' %}" class="btn ghost">Cancel</a>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,479 @@
+{% extends "base.html" %}
+{% load rbac_tags %}
+{% block crumb %}<a href="{% url 'clients:list' %}">Clients</a> / <a href="{{ project.client.get_absolute_url }}">{{ project.client.name }}</a> / {{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h2>{{ project.name }}</h2>
+    <p>{{ project.client.name }}{% if project.project_type %} · {{ project.project_type }}{% endif %}</p></div>
+  <div class="page-actions">
+    {% if can.reports %}
+    <a href="{% url 'documents:monthly_report' project.pk %}" class="btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      Monthly report</a>
+    {% endif %}
+    {% if can.delivery %}
+    <a href="{% url 'projects:edit' project.pk %}" class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>
+      Edit project</a>
+    {% endif %}
+  </div>
+</div>
+
+{# a. OVERVIEW #}
+<div class="card">
+  <div class="card-b" style="padding:16px 20px">
+    <div class="ov-meta">
+      <div class="ov-item"><div class="fin-l">Status</div>
+        <span class="tag {% if project.status == 'ACTIVE' %}ok{% elif project.status == 'ON_HOLD' %}warn{% elif project.status == 'CANCELLED' %}danger{% else %}gray{% endif %}">{{ project.get_status_display }}</span></div>
+      <div class="ov-item"><div class="fin-l">Type</div>
+        <div class="ov-v">{{ project.project_type|default:"—" }}</div></div>
+      <div class="ov-item"><div class="fin-l">Start</div>
+        <div class="ov-v">{{ project.start_date|date:"d M Y"|default:"—" }}</div></div>
+      <div class="ov-item"><div class="fin-l">Target</div>
+        <div class="ov-v">{{ project.target_end_date|date:"d M Y"|default:"—" }}</div></div>
+      <div class="ov-item"><div class="fin-l">Project value</div>
+        <div class="ov-v">{% if project.budget %}₹{{ project.budget|floatformat:"0g" }}{% else %}—{% endif %}</div></div>
+    </div>
+    {% if project.description %}
+    <p style="color:var(--ink-soft);font-size:13px;margin-top:12px">{{ project.description|linebreaksbr }}</p>
+    {% endif %}
+    {% if project.live_url or project.staging_url or project.repo_url or project.assets_url %}
+    <div class="ov-links">
+      {% if project.live_url %}<a class="btn ghost sm" href="{{ project.live_url }}" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        Live site</a>{% endif %}
+      {% if project.staging_url %}<a class="btn ghost sm" href="{{ project.staging_url }}" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        Staging</a>{% endif %}
+      {% if project.repo_url %}<a class="btn ghost sm" href="{{ project.repo_url }}" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+        Repository</a>{% endif %}
+      {% if project.assets_url %}<a class="btn ghost sm" href="{{ project.assets_url }}" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        Asset folder</a>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% comment %}
+Team. Membership is not decoration — it is what makes this project visible at
+all to anyone without the projects.view_all bypass, which is why removing
+someone reads as a permission change rather than a tidy-up.
+{% endcomment %}
+<div class="card" style="margin-top:18px" id="team">
+  <div class="card-h"><h3>Team</h3>
+    <span class="tag gray">{{ members|length }} on this project</span>
+  </div>
+  {% if can_manage_members %}
+  <form method="post" action="{% url 'projects:members' project.pk %}" class="inline-form labelled">
+    {% csrf_token %}
+    <label class="if-field grow">
+      <span class="if-l">Add someone to the project</span>
+      <select name="user">
+        <option value="">Choose a person…</option>
+        {% for u in addable_people %}
+          <option value="{{ u.pk }}">{{ u.get_full_name|default:u.username }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button class="btn sm" type="submit">Add</button>
+  </form>
+  {% endif %}
+  <div class="card-b">
+    {% if members %}
+    <ul class="member-list">
+      {% for m in members %}
+      <li class="member-row">
+        <span class="emp-avatar sm" aria-hidden="true">{{ m.get_full_name|default:m.username|slice:":1"|upper }}</span>
+        <span class="member-body">
+          <span class="member-name">{{ m.get_full_name|default:m.username }}</span>
+          <span class="member-role">{{ m.designation|default:"No designation set" }}</span>
+        </span>
+        {% if can_manage_members %}
+        <form method="post" action="{% url 'projects:members' project.pk %}"
+              onsubmit="return confirm('Remove {{ m.get_full_name|default:m.username|escapejs }} from this project? They will no longer be able to open it.')">
+          {% csrf_token %}
+          <input type="hidden" name="user" value="{{ m.pk }}">
+          <input type="hidden" name="action" value="remove">
+          <button type="submit" class="member-x" title="Remove from project"
+                  aria-label="Remove {{ m.get_full_name|default:m.username }} from this project">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </form>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="kan-empty">Nobody has been added yet. Managers can still see this
+      project; everyone else needs to be on this list.</p>
+    {% endif %}
+  </div>
+</div>
+
+{# b. TASKS #}
+<div class="card" style="margin-top:18px" id="tasks">
+  <div class="card-h"><h3>Tasks</h3>
+    <span style="display:flex;gap:6px;flex-wrap:wrap">
+      <span class="tag gray">{{ task_summary.todo }} to do</span>
+      <span class="tag info">{{ task_summary.in_progress }} in progress</span>
+      <span class="tag warn">{{ task_summary.submitted }} submitted</span>
+      <span class="tag ok">{{ task_summary.done }} done</span>
+    </span>
+  </div>
+  {% user_can user 'tasks' 'create' as can_add_task %}
+  {% if can_add_task %}
+  <form method="post" action="{% url 'projects:task_create' project.pk %}" class="inline-form labelled">
+    {% csrf_token %}
+    <label class="if-field grow">
+      <span class="if-l">Task</span>
+      <input name="title" placeholder="What needs doing?" required>
+    </label>
+    <label class="if-field">
+      <span class="if-l">Priority</span>
+      <select name="priority">
+        {% for value, label in task_priorities %}
+          <option value="{{ value }}" {% if value == 'MED' %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="if-field">
+      <span class="if-l">Assign to</span>
+      <select name="assignee">
+        <option value="">Unassigned</option>
+        {% for u in team %}<option value="{{ u.pk }}">{{ u.get_full_name|default:u.username }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="if-field">
+      <span class="if-l">Reviewed by</span>
+      <select name="reviewer">
+        <option value="">No reviewer</option>
+        {% for u in team %}<option value="{{ u.pk }}">{{ u.get_full_name|default:u.username }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="if-field">
+      <span class="if-l">Department</span>
+      <select name="department">
+        <option value="">No department</option>
+        {% for d in departments %}<option value="{{ d.pk }}">{{ d.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="if-field">
+      <span class="if-l">Est. hours</span>
+      <input type="number" step="0.25" min="0" name="estimated_hours" placeholder="0" style="width:88px">
+    </label>
+    <label class="if-field">
+      <span class="if-l">Due date</span>
+      <input type="date" name="due_date">
+    </label>
+    <button class="btn sm" type="submit">Add</button>
+  </form>
+  {% endif %}
+  <div class="kanban four">
+    <div class="kan-col">
+      <div class="kan-h">To do <span class="tag gray">{{ tasks_todo|length }}</span></div>
+      {% for t in tasks_todo %}{% include "projects/_task_card.html" with t=t back=request.path %}{% empty %}<p class="kan-empty">Nothing queued.</p>{% endfor %}
+    </div>
+    <div class="kan-col">
+      <div class="kan-h">In progress <span class="tag info">{{ tasks_progress|length }}</span></div>
+      {% for t in tasks_progress %}{% include "projects/_task_card.html" with t=t back=request.path %}{% empty %}<p class="kan-empty">Nothing running.</p>{% endfor %}
+    </div>
+    <div class="kan-col">
+      <div class="kan-h">Submitted <span class="tag warn">{{ tasks_submitted|length }}</span></div>
+      {% for t in tasks_submitted %}{% include "projects/_task_card.html" with t=t back=request.path %}{% empty %}<p class="kan-empty">Nothing awaiting review.</p>{% endfor %}
+    </div>
+    <div class="kan-col">
+      <div class="kan-h">Done <span class="tag ok">{{ tasks_done|length }}</span></div>
+      {% for t in tasks_done %}{% include "projects/_task_card.html" with t=t back=request.path %}{% empty %}<p class="kan-empty">Nothing yet.</p>{% endfor %}
+    </div>
+  </div>
+</div>
+
+{# c. WORK LOG #}
+<div class="card" style="margin-top:18px" id="worklog">
+  <div class="card-h"><h3>Work log</h3>
+    <span style="display:flex;gap:6px;flex-wrap:wrap">
+      <span class="tag gray">{{ worklog_summary.total|floatformat:"-2" }} h total</span>
+      <span class="tag ok">{{ worklog_summary.billable|floatformat:"-2" }} h billable</span>
+      {% if worklog_summary.non_billable %}<span class="tag">{{ worklog_summary.non_billable|floatformat:"-2" }} h non-billable</span>{% endif %}
+    </span>
+  </div>
+  {% user_can user 'worklogs' 'view' as can_worklogs %}
+  {% user_can user 'worklogs' 'edit' as can_worklog_edit %}
+  {% if can_worklogs %}
+  <form method="post" action="{% url 'projects:worklog_create' project.pk %}"
+        class="inline-form labelled" enctype="multipart/form-data">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.path }}#worklog">
+    <label class="if-field">
+      <span class="if-l">Date</span>
+      <input type="date" name="date" value="{{ today|date:'Y-m-d' }}" required>
+    </label>
+    <label class="if-field">
+      <span class="if-l">Against task</span>
+      <select name="task">
+        <option value="">Project-level work</option>
+        {% for t in open_tasks %}<option value="{{ t.pk }}">{{ t.title }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="if-field">
+      <span class="if-l">Category</span>
+      <select name="category">
+        {% for value, label in worklog_categories %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="if-field grow">
+      <span class="if-l">What got done</span>
+      <input name="description" placeholder="One line the client would understand" required>
+    </label>
+    <label class="if-field">
+      <span class="if-l">Start</span>
+      <input type="time" name="start_time">
+    </label>
+    <label class="if-field">
+      <span class="if-l">End</span>
+      <input type="time" name="end_time">
+    </label>
+    <label class="if-field">
+      <span class="if-l">Hours</span>
+      <input type="number" name="hours" step="0.25" min="0" placeholder="0" style="width:74px">
+    </label>
+    <label class="check-inline"><input type="checkbox" name="is_billable" checked> Billable</label>
+    <button class="btn sm" type="submit">Log</button>
+  </form>
+  {% endif %}
+
+  {# Filter bar — GET so a filtered view is linkable and survives a refresh. #}
+  <form method="get" action="{{ request.path }}#worklog" class="filter-bar">
+    <label class="inl-l" for="f-member">Member</label>
+    <select name="member" id="f-member">
+      <option value="">Everyone</option>
+      {% for m in worklog_filters.members %}
+        <option value="{{ m.pk }}" {% if worklog_filters.member == m.pk|stringformat:"s" %}selected{% endif %}>{{ m.get_full_name|default:m.username }}</option>
+      {% endfor %}
+    </select>
+    <label class="inl-l" for="f-billable">Billable</label>
+    <select name="billable" id="f-billable">
+      <option value="">Any</option>
+      <option value="yes" {% if worklog_filters.billable == 'yes' %}selected{% endif %}>Billable</option>
+      <option value="no" {% if worklog_filters.billable == 'no' %}selected{% endif %}>Non-billable</option>
+    </select>
+    <label class="inl-l" for="f-approval">Status</label>
+    <select name="approval" id="f-approval">
+      <option value="">Any</option>
+      {% for value, label in worklog_approval_choices %}
+        <option value="{{ value }}" {% if worklog_filters.approval == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <label class="inl-l" for="f-from">From</label>
+    <input type="date" name="from" id="f-from" value="{{ worklog_filters.from }}">
+    <label class="inl-l" for="f-to">To</label>
+    <input type="date" name="to" id="f-to" value="{{ worklog_filters.to }}">
+    <button class="btn sm ghost" type="submit">Filter</button>
+    {% if worklog_filters.active %}
+      <a class="link-act" href="{{ request.path }}#worklog">Clear</a>
+      <span class="filter-count">{{ work_logs|length }} shown · {{ worklog_filtered_total|floatformat:"-2" }} h</span>
+    {% endif %}
+  </form>
+
+  {% if work_logs %}
+  <div class="table-wrap">
+  <table class="ts-table">
+    <tbody>
+    {% for w in work_logs %}
+      <tr>
+        <td class="ts-when">{{ w.date|date:"d M Y" }}</td>
+        <td class="ts-what">
+          <strong>{{ w.description }}</strong>
+          <div class="ts-sub">
+            {% if w.logged_by %}{{ w.logged_by.get_full_name|default:w.logged_by.username }}{% else %}—{% endif %}
+            · {{ w.get_category_display }}
+            {% if w.task %} · <a href="{{ w.task.get_absolute_url }}">{{ w.task.title }}</a>{% endif %}
+            {% if w.start_time and w.end_time %} · {{ w.start_time|time:"H:i" }}–{{ w.end_time|time:"H:i" }}{% endif %}
+          </div></td>
+        <td class="ts-hours">{% if w.hours %}{{ w.hours|floatformat:"-2" }} h{% endif %}</td>
+        <td class="ts-billable">
+          {% if w.is_billable %}<span class="tag ok">Billable</span>
+          {% else %}<span class="tag gray">Non-billable</span>{% endif %}</td>
+        <td class="ts-status">
+          {% if w.approval_status == 'APPROVED' %}<span class="tag ok">Approved</span>
+          {% elif w.approval_status == 'SUBMITTED' %}<span class="tag info">Awaiting approval</span>
+          {% elif w.approval_status == 'REJECTED' %}<span class="tag danger">Needs changes</span>
+          {% else %}<span class="tag gray">Draft</span>{% endif %}</td>
+        <td class="ts-acts">
+          {% if w.logged_by_id == user.pk or can_worklog_edit %}
+            {% if not w.is_locked %}
+            <a class="link-act" href="{% url 'projects:worklog_edit' w.pk %}?next={{ request.path|urlencode }}">Edit</a>
+            <form method="post" action="{% url 'projects:worklog_delete' w.pk %}" onsubmit="return confirm('Delete this entry?')">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ request.path }}#worklog">
+              <button type="submit" class="link-act muted">Delete</button>
+            </form>
+            {% endif %}
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% elif worklog_filters.active %}
+  <div class="card-b"><p class="kan-empty">No entries match those filters.</p></div>
+  {% else %}
+  <div class="empty" style="padding:24px 20px"><h3>No work logged yet</h3>
+    <p>Log what gets done — the monthly report reads from here.</p></div>
+  {% endif %}
+</div>
+
+{# d. ASSETS #}
+<div class="card" style="margin-top:18px" id="assets">
+  <div class="card-h"><h3>Assets</h3></div>
+  {% if can.delivery %}
+  <form method="post" action="{% url 'projects:asset_upload' project.pk %}" class="inline-form labelled upload-form" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="file-pick" style="flex:1.5;min-width:180px">
+      <span class="if-l">File</span>
+      <input type="file" name="file" required>
+      <span class="upload-hint">Up to {{ max_upload_label }} · images are compressed automatically</span>
+    </div>
+    <label class="if-field mid">
+      <span class="if-l">Title</span>
+      <input name="title" placeholder="Defaults to the filename">
+    </label>
+    <label class="if-field">
+      <span class="if-l">Category</span>
+      <select name="category">
+        {% for value, label in asset_categories %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      </select>
+    </label>
+    <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;white-space:nowrap">
+      <input type="checkbox" name="is_report_proof" value="1" style="width:15px;height:15px"> Feature in report</label>
+    <button class="btn sm" type="submit">Upload</button>
+    {% include "_drive_fallback.html" %}
+  </form>
+  {% endif %}
+  <div class="card-b">
+    {% for label, group in asset_groups %}
+      <div class="divider" style="margin-top:{% if forloop.first %}0{% else %}18px{% endif %}">{{ label }}</div>
+      <div class="asset-grid">
+        {% for a in group %}{% include "projects/_asset_card.html" with a=a %}{% endfor %}
+      </div>
+    {% endfor %}
+    {% if credential_assets %}
+      <div class="cred-box">
+        <div class="divider" style="margin-top:0;display:flex;align-items:center;gap:6px">
+          <svg style="width:12px;height:12px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Credentials — handle with care</div>
+        <div class="asset-grid">
+          {% for a in credential_assets %}{% include "projects/_asset_card.html" with a=a %}{% endfor %}
+        </div>
+      </div>
+    {% endif %}
+    {% if not asset_groups and not credential_assets %}
+    <div class="empty" style="padding:24px 20px"><h3>No assets yet</h3>
+      <p>Upload brand files, deliverables and proof screenshots here.</p></div>
+    {% endif %}
+  </div>
+</div>
+
+{# e. MILESTONES #}
+<div class="card" style="margin-top:18px" id="milestones">
+  <div class="card-h"><h3>Milestones</h3></div>
+  {% if can.delivery %}
+  <form method="post" action="{% url 'projects:milestone_create' project.pk %}" class="inline-form labelled">
+    {% csrf_token %}
+    <label class="if-field grow">
+      <span class="if-l">Milestone</span>
+      <input name="title" placeholder="A checkpoint the client cares about" required>
+    </label>
+    <label class="if-field">
+      <span class="if-l">Due date</span>
+      <input type="date" name="due_date">
+    </label>
+    <button class="btn sm" type="submit">Add</button>
+  </form>
+  {% endif %}
+  {% if milestones %}
+  <div class="timeline">
+    {% for m in milestones %}
+    <div class="tl-row {% if m.status == 'DONE' %}done{% endif %}">
+      <span class="tl-dot {% if m.status == 'DONE' %}on{% elif m.status == 'IN_PROGRESS' %}half{% endif %}"></span>
+      <div class="tl-body">
+        <strong>{{ m.title }}</strong>
+        {% if m.due_date %}<span class="tl-due">due {{ m.due_date|date:"d M Y" }}</span>{% endif %}
+        {% if m.description %}<div style="color:var(--ink-soft);font-size:12.5px">{{ m.description }}</div>{% endif %}
+      </div>
+      <span class="tag {% if m.status == 'DONE' %}ok{% elif m.status == 'IN_PROGRESS' %}info{% else %}gray{% endif %}">{{ m.get_status_display }}</span>
+      {% if can.delivery %}
+      <span class="tl-actions">
+        {% if m.status != 'DONE' %}
+        <form method="post" action="{% url 'projects:milestone_set_status' m.pk %}">
+          {% csrf_token %}<input type="hidden" name="status" value="DONE">
+          <button type="submit" class="link-act">Mark done</button></form>
+        {% else %}
+        <form method="post" action="{% url 'projects:milestone_set_status' m.pk %}">
+          {% csrf_token %}<input type="hidden" name="status" value="PENDING">
+          <button type="submit" class="link-act">Reopen</button></form>
+        {% endif %}
+        <a href="{% url 'projects:milestone_edit' m.pk %}" class="link-act">Edit</a>
+        <form method="post" action="{% url 'projects:milestone_delete' m.pk %}" onsubmit="return confirm('Delete milestone “{{ m.title }}”?')">
+          {% csrf_token %}<button type="submit" class="link-danger" style="margin-left:0">Delete</button></form>
+      </span>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty" style="padding:24px 20px"><h3>No milestones</h3>
+    <p>Break the delivery into checkpoints.</p></div>
+  {% endif %}
+</div>
+
+{# f. COMPACT SUMMARIES #}
+<div class="summary-strip">
+  {% if can_view_finance %}
+  <div class="card sum-card">
+    <div class="fin-l">Finances</div>
+    <div class="sum-line">
+      <span>Value <strong>{% if project.budget %}₹{{ project.budget|floatformat:"0g" }}{% else %}—{% endif %}</strong></span>
+      <span>Received <strong>₹{{ project.total_received|floatformat:"0g" }}</strong></span>
+      <span>Due <strong {% if project.outstanding > 0 %}style="color:var(--warn)"{% endif %}>₹{{ project.outstanding|floatformat:"0g" }}</strong></span>
+    </div>
+    {% if can.finance %}
+    <a href="{% url 'finance:payment_create' project.pk %}" class="btn soft sm" style="margin-top:10px">Record payment</a>
+    {% endif %}
+  </div>
+  {% endif %}
+  <div class="card sum-card">
+    <div class="fin-l">Onboarding</div>
+    <div class="sum-line"><span class="tag {% if onboarding.done == onboarding.total %}ok{% else %}gray{% endif %}">{{ onboarding.done }}/{{ onboarding.total }}</span>
+      <span style="color:var(--ink-soft);font-size:12.5px">{{ onboarding.percent }}% complete</span></div>
+    <div class="progress" style="margin-top:10px;border-radius:3px" role="progressbar" aria-valuenow="{{ onboarding.percent }}" aria-valuemin="0" aria-valuemax="100" aria-label="Onboarding progress">
+      <div class="progress-fill" style="width:{{ onboarding.percent }}%"></div>
+    </div>
+  </div>
+  <div class="card sum-card">
+    <div class="fin-l">Documents</div>
+    <div class="sum-line"><span class="tag gray">{{ doc_count }}</span>
+      <a href="{% url 'documents:list' %}?q={{ project.name|urlencode }}" style="color:var(--primary);font-size:12.5px;font-weight:600">View documents →</a></div>
+    {% user_can user 'documents' 'create' as can_add_doc %}
+    {% if can_add_doc %}
+    <details class="menu" style="margin-top:10px">
+      <summary class="btn soft sm">+ New document</summary>
+      <div class="pop">
+        {% regroup doc_types by get_category_display as stages %}
+        {% for stage in stages %}
+          <div class="divider">{{ stage.grouper }}</div>
+          {% for t in stage.list %}
+            <a href="{% url 'documents:create' project.pk t.slug %}">{{ t.name }}</a>
+          {% endfor %}
+        {% empty %}
+          <p style="padding:12px;color:var(--ink-soft);font-size:12.5px">No document types configured.</p>
+        {% endfor %}
+      </div>
+    </details>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

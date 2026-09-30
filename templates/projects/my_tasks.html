@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}My tasks · Livo OS{% endblock %}
+{% block crumb %}My tasks{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h2>My tasks</h2>
+    <p>Everything assigned to you, across all projects.</p>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <span class="tag gray">{{ open_count }} open</span>
+    {% if overdue_count %}<span class="tag danger">{{ overdue_count }} overdue</span>{% endif %}
+    {% if to_review %}<span class="tag info">{{ to_review|length }} to review</span>{% endif %}
+  </div>
+</div>
+
+{% if to_review %}
+{# Reviewer queue first: someone else is blocked until you act on these. #}
+<div class="card" style="margin-top:18px">
+  <div class="card-h"><h3>To review</h3>
+    <span class="tag info">{{ to_review|length }} waiting on you</span></div>
+  <div class="card-b">
+    <div class="mt-grid">
+      {% for t in to_review %}
+        {% include "projects/_task_card.html" with t=t back=request.path show_project=True %}
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="card" style="margin-top:18px">
+  <div class="card-h"><h3>Assigned to me</h3>
+    <span style="display:flex;gap:6px;flex-wrap:wrap">
+      <span class="tag gray">{{ tasks_todo|length }} to do</span>
+      <span class="tag info">{{ tasks_progress|length }} in progress</span>
+      <span class="tag warn">{{ tasks_submitted|length }} submitted</span>
+      <span class="tag ok">{{ done_total }} done</span>
+    </span>
+  </div>
+
+  {% if open_count or done_total %}
+  <div class="kanban four">
+    <div class="kan-col">
+      <div class="kan-h">To do <span class="tag gray">{{ tasks_todo|length }}</span></div>
+      {% for t in tasks_todo %}
+        {% include "projects/_task_card.html" with t=t back=request.path show_project=True %}
+      {% empty %}<p class="kan-empty">Nothing queued.</p>{% endfor %}
+    </div>
+    <div class="kan-col">
+      <div class="kan-h">In progress <span class="tag info">{{ tasks_progress|length }}</span></div>
+      {% for t in tasks_progress %}
+        {% include "projects/_task_card.html" with t=t back=request.path show_project=True %}
+      {% empty %}<p class="kan-empty">Nothing running.</p>{% endfor %}
+    </div>
+    <div class="kan-col">
+      <div class="kan-h">Submitted <span class="tag warn">{{ tasks_submitted|length }}</span></div>
+      {% for t in tasks_submitted %}
+        {% include "projects/_task_card.html" with t=t back=request.path show_project=True %}
+      {% empty %}<p class="kan-empty">Nothing awaiting review.</p>{% endfor %}
+    </div>
+    <div class="kan-col">
+      <div class="kan-h">Done <span class="tag ok">{{ done_total }}</span></div>
+      {% for t in tasks_done %}
+        {% include "projects/_task_card.html" with t=t back=request.path show_project=True %}
+      {% empty %}<p class="kan-empty">Nothing yet.</p>{% endfor %}
+      {% if done_total > tasks_done|length %}
+        <p class="kan-empty">Showing the {{ tasks_done|length }} most recent of {{ done_total }}.</p>
+      {% endif %}
+    </div>
+  </div>
+  {% else %}
+  <div class="card-b">
+    <div class="empty-state">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      <p><strong>Nothing assigned to you.</strong></p>
+      <p>Tasks show up here the moment someone assigns you one.</p>
+      <a class="btn ghost sm" href="{% url 'projects:list' %}">Browse projects</a>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

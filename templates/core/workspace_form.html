@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block crumb %}<a href="{% url 'core:workspace_list' %}">Workspaces</a> · {% if workspace %}{{ workspace.name }}{% else %}New{% endif %}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>{% if workspace %}Edit workspace{% else %}New workspace{% endif %}</h2>
+    <p>A workspace is a partition. Anyone you put in it sees its clients,
+       projects, documents and figures — and nothing from any other workspace,
+       whatever role they hold.</p>
+  </div>
+</div>
+
+<form method="post" style="max-width:620px">
+  {% csrf_token %}
+  <div class="card"><div class="card-b">
+    <div class="field">
+      <label for="ws-name">Name</label>
+      <input id="ws-name" name="name" required
+             value="{% firstof posted.name workspace.name '' %}"
+             placeholder="e.g. Northwind Partners">
+      {% if workspace.is_home %}
+      <div class="hint">This is your own agency's workspace. Renaming it is safe;
+        it can't be deactivated or removed, because every record created before
+        partner access existed belongs to it.</div>
+      {% endif %}
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label for="ws-color">Colour</label>
+        <input id="ws-color" name="color" type="color" style="height:40px;padding:4px"
+               value="{% firstof posted.color workspace.color '#6366f1' %}">
+        <div class="hint">Shown on the workspace switcher, so it's obvious at a
+          glance whose numbers are on screen.</div>
+      </div>
+      {% if not workspace.is_home %}
+      <div class="field">
+        <label for="ws-active">Status</label>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:500">
+          <input id="ws-active" type="checkbox" name="is_active"
+                 {% if not workspace or workspace.is_active %}checked{% endif %}>
+          Active
+        </label>
+        <div class="hint">Deactivating hides the workspace from the switcher and
+          stops anyone in it signing into its data. Nothing is deleted.</div>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="field">
+      <label for="ws-notes">Notes</label>
+      <textarea id="ws-notes" name="notes" rows="3"
+                placeholder="Who this partner is, what the arrangement covers.">{% firstof posted.notes workspace.notes '' %}</textarea>
+    </div>
+  </div></div>
+
+  <div style="margin-top:16px;display:flex;gap:10px;align-items:center">
+    <button class="btn" type="submit">Save workspace</button>
+    <a href="{% url 'core:workspace_list' %}" class="btn ghost">Cancel</a>
+  </div>
+</form>
+
+{% if workspace and not workspace.is_home %}
+<div class="card" style="margin-top:22px;max-width:620px">
+  <div class="card-h"><h3>What this workspace holds</h3></div>
+  <div class="card-b" style="font-size:13px;color:var(--ink-soft)">
+    <p>Clients, projects, tasks, work logs, documents, invoices, payments,
+       calendar events and activity created inside it. Its people see those and
+       only those — their dashboard, charts and exports are all narrowed the
+       same way.</p>
+    <p style="margin-top:10px">Shared across every workspace, by design: the
+       employee directory, departments and designations, document templates and
+       types, and your agency branding on generated PDFs. Salary and bank
+       details are <strong>not</strong> shared — those stay visible only within
+       a person's own workspace.</p>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% load rbac_tags %}
+{% block crumb %}Clients{% endblock %}
+{% block content %}
+{% user_can user 'clients' 'create' as can_add_client %}
+{% user_can user 'clients' 'delete' as can_del_client %}
+<div class="page-head">
+  <div><h2>Clients</h2><p>{{ clients|length }} active client{{ clients|length|pluralize }}.</p></div>
+  {% if can_add_client %}
+  <a href="{% url 'clients:create' %}" class="btn">+ New client</a>
+  {% endif %}
+</div>
+
+{% if can_del_client %}
+<form id="bulk-clients" data-bulk method="post" action="{% url 'clients:bulk_delete' %}"
+      onsubmit="return confirm('Delete the selected clients? Their projects and documents will be deleted too. This cannot be undone.')">
+  {% csrf_token %}
+</form>
+<div class="bulk-bar" data-bulk-bar="bulk-clients" hidden>
+  <span class="count">0 selected</span>
+  <button class="btn sm danger" type="submit" form="bulk-clients">Delete selected</button>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-h">
+    <form method="get" class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input name="q" value="{{ q }}" placeholder="Search clients…">
+    </form>
+  </div>
+  {% if clients %}
+  <div class="table-wrap">
+  <table><thead><tr>
+    {% if can_del_client %}<th class="chk"><input type="checkbox" data-bulk-all="bulk-clients" title="Select all"></th>{% endif %}
+    <th>Client</th><th>City</th><th>Projects</th><th>Contact</th>
+    {% if can.clients %}<th></th>{% endif %}
+  </tr></thead><tbody>
+  {% for c in clients %}
+    <tr>
+    {% if can_del_client %}
+    <td class="chk"><input type="checkbox" name="selected" value="{{ c.pk }}" form="bulk-clients" aria-label="Select {{ c.name }}"></td>
+    {% endif %}
+    <td><a href="{{ c.get_absolute_url }}"><strong>{{ c.name }}</strong></a></td>
+    <td>{{ c.city|default:"—" }}</td>
+    <td><span class="tag gray">{{ c.visible_projects|length }}</span></td>
+    <td>{% with pc=c.primary_contact %}{{ pc.name|default:"—" }}{% endwith %}</td>
+    {% if can.clients %}
+    <td class="row-actions">
+      <a href="{% url 'clients:edit' c.pk %}">Edit</a>
+      {% if can_del_client %}
+      <form method="post" action="{% url 'clients:delete' c.pk %}" style="display:inline"
+            onsubmit="return confirm('Delete “{{ c.name|escapejs }}”? Its projects and documents will be deleted too. This cannot be undone.')">
+        {% csrf_token %}<button type="submit" class="link-danger">Delete</button>
+      </form>
+      {% endif %}
+    </td>
+    {% endif %}
+    </tr>
+  {% endfor %}</tbody></table>
+  </div>
+  {% else %}
+  <div class="empty"><h3>No clients yet</h3><p>Add your first client to get started.</p>
+    {% if can_add_client %}
+    <div style="margin-top:14px"><a href="{% url 'clients:create' %}" class="btn">+ New client</a></div>
+    {% endif %}</div>
+  {% endif %}
+</div>
+{% include "_bulk_select.html" %}
+{% endblock %}

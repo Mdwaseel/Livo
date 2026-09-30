@@ -1,0 +1,37 @@
+{% comment %}
+One event, full width — the unit of the day view, the agenda and the day panel.
+
+Roomier than a chip on purpose: these lists are where an entry has to be
+readable and tappable rather than merely countable, so the row carries the kind
+as text, the time range, the context line and the status, and clears the 44px
+touch target a chip in a month cell cannot.
+{% endcomment %}
+<div class="ev-row tone-{{ event.kind_info.tone }}{% if event.is_overdue %} late{% endif %}"
+     {% if event.is_movable %}draggable="true" data-movable="1"
+     data-source="{{ event.source }}" data-id="{{ event.object_id }}"
+     data-date="{{ event.start_date|date:'Y-m-d' }}"
+     {% if event.occurrence_date %}data-occurrence="{{ event.occurrence_date|date:'Y-m-d' }}"{% endif %}
+     {% endif %}>
+  <span class="ev-marker" aria-hidden="true">{{ event.kind_info.marker }}</span>
+  <div class="ev-when">
+    {% if event.is_all_day %}
+      <span class="all-day">All day</span>
+    {% else %}
+      <strong>{{ event.start_time|time:"H:i" }}</strong>
+      {% if event.end_time %}<span class="to">–{{ event.end_time|time:"H:i" }}</span>{% endif %}
+    {% endif %}
+  </div>
+  <div class="ev-body">
+    <a class="ev-title" href="{{ event.url }}">{{ event.title }}</a>
+    <div class="ev-meta">
+      <span class="ev-kind">{{ event.kind_info.label }}</span>
+      {% if event.detail %}<span class="sep" aria-hidden="true">·</span>{{ event.detail }}{% endif %}
+      {% if event.user_name %}<span class="sep" aria-hidden="true">·</span>{{ event.user_name }}{% endif %}
+    </div>
+  </div>
+  {% if event.is_overdue %}
+    <span class="tag danger">Overdue</span>
+  {% elif event.status_label %}
+    <span class="tag gray">{{ event.status_label }}</span>
+  {% endif %}
+</div>

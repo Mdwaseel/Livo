@@ -1,0 +1,40 @@
+{% comment %}
+Table layout and inline styles: mail clients strip <style> blocks and have no
+flexbox, so anything smarter than this renders as a broken stack in Outlook.
+{% endcomment %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#131715;padding:32px 12px;font-family:Segoe UI,Helvetica,Arial,sans-serif">
+  <tr><td align="center">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#1b201e;border:1px solid #2e3833;border-radius:14px">
+      <tr><td style="padding:30px 32px 8px">
+        <div style="font-size:13px;letter-spacing:.18em;text-transform:uppercase;color:#17e381;font-weight:700">Livo OS</div>
+        <h1 style="margin:14px 0 6px;font-size:20px;color:#ffffff;font-weight:700">Your sign-in code</h1>
+        <p style="margin:0;color:#a6aca9;font-size:14px;line-height:1.6">
+          Hi {{ user.get_full_name|default:user.username }}, use this code to finish signing in.
+        </p>
+      </td></tr>
+      <tr><td style="padding:22px 32px">
+        <div style="background:#131715;border:1px solid #36403b;border-radius:10px;padding:18px;text-align:center">
+          <div style="font-family:Consolas,Menlo,monospace;font-size:34px;letter-spacing:.34em;color:#ffffff;font-weight:700;padding-left:.34em">{{ code }}</div>
+        </div>
+        <p style="margin:14px 0 0;color:#a6aca9;font-size:13px;line-height:1.6">
+          Expires in {{ minutes }} minutes. It can only be used once.
+        </p>
+      </td></tr>
+      <tr><td style="padding:0 32px 8px">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:12.5px;color:#848a87">
+          <tr><td style="padding:3px 0">Requested</td><td align="right" style="color:#cbcfcd">{{ when }}</td></tr>
+          <tr><td style="padding:3px 0">From IP</td><td align="right" style="color:#cbcfcd">{{ ip }}</td></tr>
+        </table>
+      </td></tr>
+      <tr><td style="padding:16px 32px 30px">
+        <div style="background:rgba(194,47,47,.14);border:1px solid rgba(194,47,47,.32);border-radius:9px;padding:13px 15px;color:#f1a8a8;font-size:12.5px;line-height:1.6">
+          <strong>Didn't try to sign in?</strong> Never share this code. Someone
+          has your password &mdash; reset it right away and tell an administrator.
+        </div>
+      </td></tr>
+    </table>
+    <div style="max-width:480px;margin-top:14px;color:#626764;font-size:11.5px">
+      Sent automatically by Livo OS. Please don't reply to this address.
+    </div>
+  </td></tr>
+</table>

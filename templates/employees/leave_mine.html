@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block crumb %}My leave{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>My leave</h2>
+    <p>Ask for time off, or record leave you've already taken. Everything goes
+       to your approver first.</p>
+  </div>
+</div>
+
+{% comment %}
+The balance sits above the forms, not below them, because it is the thing that
+changes what someone fills in. Knowing you have two days left before you pick
+dates is the difference between a request and a surprise deduction.
+{% endcomment %}
+<div class="lv-balance">
+  <div class="lv-stat">
+    <b>{{ balance.remaining|floatformat:"-1" }}</b>
+    <span>Days left of {{ balance.allowed }}</span>
+  </div>
+  <div class="lv-stat">
+    <b>{{ balance.used|floatformat:"-1" }}</b>
+    <span>Used in {{ balance.year }}</span>
+  </div>
+  {% if balance.over %}
+  <div class="lv-stat over">
+    <b>{{ balance.over|floatformat:"-1" }}</b>
+    <span>Days over allowance</span>
+  </div>
+  {% endif %}
+  {% if balance.unpaid %}
+  <div class="lv-stat over">
+    <b>{{ balance.unpaid|floatformat:"-1" }}</b>
+    <span>Unpaid days</span>
+  </div>
+  {% endif %}
+  {% if balance.pending %}
+  <div class="lv-stat pending">
+    <b>{{ balance.pending }}</b>
+    <span>Awaiting approval</span>
+  </div>
+  {% endif %}
+</div>
+
+{% if show_cost and balance.remaining == 0 %}
+<div class="banner">
+  <span>You've used your {{ balance.allowed }} days for {{ balance.year }}.
+    Further leave is deducted at about ₹{{ daily_rate|floatformat:0 }} a day,
+    unless it's a public holiday or comp off.</span>
+</div>
+{% endif %}
+
+<form method="post" action="{% url 'employees:leave_request' %}" class="card"
+      style="margin-bottom:20px">
+  {% csrf_token %}
+  <div class="card-h">
+    <h3>Book or record leave</h3>
+    <span class="hint">Past dates are fine — use this to log leave you've
+      already taken.</span>
+  </div>
+  <div class="card-b">
+    <div class="row">
+      <div class="field">
+        <label for="lv-kind">Type</label>
+        <select id="lv-kind" name="kind">
+          {% for value, label in kinds %}
+          <option value="{{ value }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="lv-start">From</label>
+        <input id="lv-start" type="date" name="start_date" required>
+      </div>
+      <div class="field">
+        <label for="lv-end">To</label>
+        <input id="lv-end" type="date" name="end_date">
+        <div class="hint">Leave blank for a single day.</div>
+      </div>
+    </div>
+    <div class="field">
+      <label for="lv-note">Reason</label>
+      <input id="lv-note" name="note" maxlength="200" required
+             placeholder="e.g. Family wedding in Chennai">
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px">
+      <input type="checkbox" name="is_half_day" value="1"
+             style="width:16px;height:16px">
+      Half day only
+    </label>
+  </div>
+  <div class="card-b" style="border-top:1px solid var(--line-2)">
+    <button class="btn" type="submit">Send for approval</button>
+  </div>
+</form>
+
+<div class="card">
+  <div class="card-h"><h3>My leave history</h3></div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr><th>Dates</th><th>Type</th><th>Reason</th><th>Status</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for r in records %}
+        <tr>
+          <td>
+            <strong>{{ r.start_date|date:"d M Y" }}</strong>
+            {% if r.end_date != r.start_date %} – {{ r.end_date|date:"d M Y" }}{% endif %}
+            {% if r.is_half_day %}<span class="hint"> · half day</span>{% endif %}
+          </td>
+          <td>{{ r.get_kind_display }}</td>
+          <td class="hint">{{ r.note|default:"—" }}
+            {% if r.decision_note %}<br><em>{{ r.decision_note }}</em>{% endif %}
+          </td>
+          <td>
+            {% if r.status == "APPROVED" %}<span class="pill pill-available">Approved</span>
+            {% elif r.status == "REQUESTED" %}<span class="pill pill-near">Awaiting approval</span>
+            {% elif r.status == "REJECTED" %}<span class="pill pill-over">Rejected</span>
+            {% else %}<span class="pill pill-off">Cancelled</span>{% endif %}
+          </td>
+          <td style="text-align:right">
+            {% if r.status == "REQUESTED" or r.status == "APPROVED" %}
+            <form method="post" action="{% url 'employees:leave_cancel' r.pk %}">
+              {% csrf_token %}
+              <button class="btn ghost sm" type="submit">Cancel</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="empty">No leave recorded yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

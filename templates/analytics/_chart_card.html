@@ -1,0 +1,43 @@
+{% load analytics_tags %}{% comment %}
+A chart in a card. `figure`/`figcaption` rather than a bare canvas: the caption
+is the chart's accessible name, and the canvas carries a role and label so a
+screen reader announces something other than "graphic".
+
+Include with:
+  {% include "analytics/_chart_card.html" with chart_id="hours-trend" title="Hours" caption="…" %}
+Optional: height (px, default 280), empty (the sentence shown when there is no
+data, default below).
+
+A chart that drills through on click is a MOUSE affordance. Every one of them on
+this dashboard is paired with a table carrying the same links, which is the
+keyboard and screen-reader path to the same place — if you add a clickable chart
+without one, the destination is unreachable for anyone not using a pointer.
+
+WHEN THERE IS NOTHING TO PLOT the canvas is not rendered at all. Chart.js draws
+an empty grid for an all-zero bar chart and draws literally nothing for an
+all-zero doughnut, so a fresh install showed a wall of blank rectangles with
+titles over them — which reads as broken software rather than as an empty
+database. A sentence saying which figure is missing is both honest and more
+useful, and it tells you what to go and do about it.
+{% endcomment %}
+<div class="card chart-card">
+  <div class="card-h"><h3>{{ title }}</h3>{% if badge %}<span class="tag gray">{{ badge }}</span>{% endif %}</div>
+  <div class="card-b">
+    {% if charts|chart_has_data:chart_id %}
+    <figure class="chart-figure" style="height:{{ height|default:280 }}px">
+      <canvas data-chart="{{ chart_id }}" role="img"
+              aria-label="{{ title }}{% if caption %} — {{ caption }}{% endif %}"></canvas>
+    </figure>
+    {% if caption %}<figcaption class="chart-caption">{{ caption }}</figcaption>{% endif %}
+    {% else %}
+    <div class="chart-empty" style="min-height:{{ height|default:280 }}px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <line x1="18" y1="20" x2="18" y2="14"/><line x1="12" y1="20" x2="12" y2="10"/>
+        <line x1="6" y1="20" x2="6" y2="16"/><line x1="3" y1="20" x2="21" y2="20"/>
+      </svg>
+      <p>{% firstof empty "Nothing recorded in this range yet." %}</p>
+    </div>
+    {% endif %}
+  </div>
+</div>

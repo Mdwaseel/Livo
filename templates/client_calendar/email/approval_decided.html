@@ -1,0 +1,34 @@
+{% comment %}Internal, so it matches the app's other notification emails.{% endcomment %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#131715;padding:32px 12px;font-family:Segoe UI,Helvetica,Arial,sans-serif">
+  <tr><td align="center">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#1b201e;border:1px solid #2e3833;border-radius:14px">
+      <tr><td style="padding:30px 32px 8px">
+        <div style="font-size:13px;letter-spacing:.18em;text-transform:uppercase;color:#17e381;font-weight:700">Livo OS</div>
+        <h1 style="margin:14px 0 6px;font-size:20px;color:#ffffff;font-weight:700">{% if approved %}Approved — good to go{% else %}The client wants changes{% endif %}</h1>
+        <p style="margin:0;color:#a6aca9;font-size:14px;line-height:1.6">
+          Hi {{ person.get_full_name|default:person.username }},
+          {{ reviewer.name|default:"the client" }} from {{ client.name }} {% if approved %}approved{% else %}asked for changes on{% endif %} version {{ approval.version }}.
+        </p>
+      </td></tr>
+      <tr><td style="padding:22px 32px 6px">
+        <div style="background:#131715;border:1px solid {% if approved %}#2f6b4f{% else %}#7a5a1f{% endif %};border-radius:10px;padding:18px 20px">
+          <div style="font-size:17px;color:#ffffff;font-weight:700;line-height:1.4">{{ activity.title }}</div>
+          <div style="margin-top:6px;color:#848a87;font-size:12.5px">{{ activity.get_kind_display }} &middot; {{ activity.date|date:"D, d M Y" }}</div>
+          {% if approval.feedback %}
+          <p style="margin:12px 0 0;color:#e9ebea;font-size:14px;line-height:1.6">&ldquo;{{ approval.feedback|linebreaksbr }}&rdquo;</p>
+          {% endif %}
+        </div>
+      </td></tr>
+      {% if url %}
+      <tr><td style="padding:20px 32px 30px">
+        <a href="{{ url }}" style="display:inline-block;background:#17e381;color:#131715;font-size:13.5px;font-weight:700;text-decoration:none;padding:11px 22px;border-radius:9px">{% if approved %}Open the approval{% else %}See the feedback{% endif %}</a>
+      </td></tr>
+      {% else %}
+      <tr><td style="padding:6px 32px 30px"></td></tr>
+      {% endif %}
+    </table>
+    <div style="max-width:520px;margin-top:14px;color:#626764;font-size:11.5px">
+      Sent automatically by Livo OS. Replying goes to {{ reviewer.name|default:"the client" }}.
+    </div>
+  </td></tr>
+</table>

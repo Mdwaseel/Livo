@@ -1,0 +1,437 @@
+{% extends "base.html" %}
+{% block title %}{{ task.title }} · Livo OS{% endblock %}
+{% block crumb %}<a href="{% url 'clients:list' %}">Clients</a> / <a href="{{ project.client.get_absolute_url }}">{{ project.client.name }}</a> / <a href="{{ project.get_absolute_url }}">{{ project.name }}</a> / Task{% endblock %}
+{% block content %}
+
+{% with prog=task.checklist_progress %}
+
+<div class="page-head">
+  <div>
+    <h2>{{ task.title }}</h2>
+    <p><a href="{{ project.get_absolute_url }}#tasks">{{ project.name }}</a> · {{ project.client.name }}</p>
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap">
+    {% if can_edit %}
+    <a href="{% url 'projects:task_edit' task.pk %}" class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>
+      Edit task</a>
+    {% endif %}
+    {% if can_delete %}
+    <form method="post" action="{% url 'projects:task_delete' task.pk %}"
+          onsubmit="return confirm('Delete task “{{ task.title }}”? This removes its checklist, comments and attachments.')">
+      {% csrf_token %}<button type="submit" class="btn ghost danger-text">Delete</button></form>
+    {% endif %}
+  </div>
+</div>
+
+{# ---------- status strip ---------- #}
+<div class="card">
+  <div class="card-b tk-strip">
+    <div class="tk-state">
+      <div class="fin-l">Status</div>
+      <span class="tag {% if task.status == 'DONE' %}ok{% elif task.status == 'IN_PROGRESS' %}info{% else %}gray{% endif %}">{{ task.get_status_display }}</span>
+      {% if task.approval_status != 'NONE' %}
+        <span class="tag {% if task.approval_status == 'SUBMITTED' %}info{% elif task.approval_status == 'APPROVED' %}ok{% else %}warn{% endif %}">{{ task.get_approval_status_display }}</span>
+      {% endif %}
+    </div>
+
+    {% if open_blockers %}
+    <div class="tk-blocked" role="status">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="4.9" y1="4.9" x2="19.1" y2="19.1"/></svg>
+      <div>
+        <strong>Blocked — can't be completed yet.</strong>
+        <div class="tk-blocked-list">
+          {% for b in open_blockers %}<a href="{% url 'projects:task_detail' b.pk %}">{{ b.title }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="tk-acts" id="review">
+      {% if can_edit %}
+        {% if task.status == 'TODO' %}
+        <form method="post" action="{% url 'projects:task_set_status' task.pk %}">{% csrf_token %}
+          <input type="hidden" name="status" value="IN_PROGRESS">
+          <button class="btn ghost sm" type="submit">Start work</button></form>
+        {% endif %}
+
+        {% if task.status != 'DONE' and task.approval_status != 'SUBMITTED' %}
+          {% if task.reviewer %}
+          <form method="post" action="{% url 'projects:task_submit' task.pk %}">{% csrf_token %}
+            <button class="btn sm" type="submit" {% if open_blockers %}disabled title="Finish the blocking tasks first"{% endif %}>
+              Submit for review</button></form>
+          {% else %}
+          <form method="post" action="{% url 'projects:task_set_status' task.pk %}">{% csrf_token %}
+            <input type="hidden" name="status" value="DONE">
+            <button class="btn sm" type="submit" {% if open_blockers %}disabled title="Finish the blocking tasks first"{% endif %}>
+              Mark done</button></form>
+          {% endif %}
+        {% endif %}
+
+        {% if task.status == 'DONE' %}
+        <form method="post" action="{% url 'projects:task_set_status' task.pk %}">{% csrf_token %}
+          <input type="hidden" name="status" value="IN_PROGRESS">
+          <button class="btn ghost sm" type="submit">Reopen task</button></form>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+  {% if task.is_awaiting_review %}
+    {% if can_review %}
+    <div class="tk-review">
+      <div class="tk-review-h">
+        <strong>Review requested</strong>
+        <span>Approve to complete, or send it back with a reason.</span>
+      </div>
+      <div class="tk-review-forms">
+        <form method="post" action="{% url 'projects:task_approve' task.pk %}">{% csrf_token %}
+          <input name="comment" placeholder="Approval note (optional)">
+          <button class="btn sm" type="submit">Approve</button>
+        </form>
+        <form method="post" action="{% url 'projects:task_reopen' task.pk %}">{% csrf_token %}
+          <input name="comment" placeholder="What needs fixing?" required>
+          <button class="btn ghost sm" type="submit">Reopen</button>
+        </form>
+      </div>
+    </div>
+    {% else %}
+    <div class="tk-review muted-note">
+      Waiting on {% if task.reviewer %}{{ task.reviewer.get_full_name|default:task.reviewer.username }}{% else %}a reviewer{% endif %} to review.
+    </div>
+    {% endif %}
+  {% endif %}
+</div>
+
+{# ---------- details ---------- #}
+<div class="card" style="margin-top:18px">
+  <div class="card-h"><h3>Details</h3>
+    {% if task.is_overdue %}<span class="tag danger">Overdue</span>{% endif %}</div>
+  <div class="card-b">
+    <div class="ov-meta">
+      <div class="ov-item"><div class="fin-l">Priority</div>
+        <span class="tag {% if task.priority == 'HIGH' %}danger{% elif task.priority == 'LOW' %}gray{% else %}warn{% endif %}">{{ task.get_priority_display }}</span></div>
+      <div class="ov-item"><div class="fin-l">Assignee</div>
+        <div class="ov-v">{% if task.assignee %}{{ task.assignee.get_full_name|default:task.assignee.username }}{% else %}—{% endif %}</div></div>
+      <div class="ov-item"><div class="fin-l">Reviewer</div>
+        <div class="ov-v">{% if task.reviewer %}{{ task.reviewer.get_full_name|default:task.reviewer.username }}{% else %}—{% endif %}</div></div>
+      <div class="ov-item"><div class="fin-l">Department</div>
+        <div class="ov-v">{{ task.department.name|default:"—" }}</div></div>
+      <div class="ov-item"><div class="fin-l">Sprint</div>
+        <div class="ov-v">{{ task.sprint.name|default:"—" }}</div></div>
+      <div class="ov-item"><div class="fin-l">Due</div>
+        <div class="ov-v">{{ task.due_date|date:"d M Y"|default:"—" }}</div></div>
+      <div class="ov-item"><div class="fin-l">Estimated</div>
+        <div class="ov-v">{% if task.estimated_hours %}{{ task.estimated_hours|floatformat:"-2" }} h{% else %}—{% endif %}</div></div>
+      <div class="ov-item"><div class="fin-l">Actual</div>
+        <div class="ov-v {% if task.is_over_estimate %}danger-text{% endif %}">
+          {{ task.actual_hours|floatformat:"-2" }} h
+          {% if task.is_over_estimate %}
+            <span class="ov-sub">+{{ task.hours_variance|floatformat:"-2" }} over</span>
+          {% endif %}
+        </div></div>
+      <div class="ov-item"><div class="fin-l">Billable</div>
+        <div class="ov-v">{% if task.is_billable %}Yes{% else %}No{% endif %}</div></div>
+      {% if task.approved_by %}
+      <div class="ov-item"><div class="fin-l">Approved by</div>
+        <div class="ov-v">{{ task.approved_by.get_full_name|default:task.approved_by.username }}
+          <span class="ov-sub">{{ task.approved_on|date:"d M Y" }}</span></div></div>
+      {% endif %}
+    </div>
+
+    {% if task.estimated_hours %}
+    {# Effort bar: fills to the estimate, then turns red once it's passed. #}
+    <div class="effort">
+      <div class="effort-head">
+        <span class="fin-l">Effort</span>
+        <span class="effort-num {% if task.is_over_estimate %}danger-text{% endif %}">
+          {{ task.actual_hours|floatformat:"-2" }} of {{ task.estimated_hours|floatformat:"-2" }} h
+          {% if task.is_over_estimate %}· over by {{ task.hours_variance|floatformat:"-2" }} h{% endif %}
+        </span>
+      </div>
+      <div class="effort-bar" role="img"
+           aria-label="{{ task.actual_hours|floatformat:'-2' }} hours logged against a {{ task.estimated_hours|floatformat:'-2' }} hour estimate">
+        <span class="{% if task.is_over_estimate %}over{% endif %}"
+              style="width:{{ task.effort_percent }}%"></span>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if task.description %}
+      <p class="tk-desc">{{ task.description|linebreaksbr }}</p>
+    {% endif %}
+  </div>
+
+  {% if can_assign %}
+  <form method="post" action="{% url 'projects:task_assign' task.pk %}" class="inline-form" style="border-top:1px solid var(--line-2);border-bottom:none">
+    {% csrf_token %}
+    <label class="inl-l" for="a-assignee">Assignee</label>
+    <select name="assignee" id="a-assignee">
+      <option value="">Unassigned</option>
+      {% for u in team %}<option value="{{ u.pk }}" {% if u.pk == task.assignee_id %}selected{% endif %}>{{ u.get_full_name|default:u.username }}</option>{% endfor %}
+    </select>
+    <label class="inl-l" for="a-reviewer">Reviewer</label>
+    <select name="reviewer" id="a-reviewer">
+      <option value="">No review needed</option>
+      {% for u in team %}<option value="{{ u.pk }}" {% if u.pk == task.reviewer_id %}selected{% endif %}>{{ u.get_full_name|default:u.username }}</option>{% endfor %}
+    </select>
+    <button class="btn sm" type="submit">Update</button>
+  </form>
+  {% endif %}
+</div>
+
+<div class="grid-2" style="margin-top:18px">
+
+  {# ---------- checklist ---------- #}
+  <div class="card">
+    <div class="card-h"><h3>Checklist</h3>
+      {% if prog.total %}<span class="tag {% if prog.done == prog.total %}ok{% else %}gray{% endif %}">{{ prog.done }}/{{ prog.total }}</span>{% endif %}</div>
+    {% if prog.total %}
+    <div class="tk-bar" role="img" aria-label="{{ prog.done }} of {{ prog.total }} items done">
+      <span style="width:{{ prog.percent }}%"></span>
+    </div>
+    {% endif %}
+    <div class="card-b" style="padding-top:12px">
+      {% for item in task.checklist.all %}
+      <div class="ck-row {% if item.is_done %}done{% endif %}">
+        {% if can_edit %}
+        <form method="post" action="{% url 'projects:checklist_toggle' item.pk %}">{% csrf_token %}
+          <button type="submit" class="ck-box {% if item.is_done %}on{% endif %}"
+                  aria-label="{% if item.is_done %}Mark “{{ item.text }}” not done{% else %}Mark “{{ item.text }}” done{% endif %}">
+            {% if item.is_done %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>{% endif %}
+          </button></form>
+        {% else %}
+        <span class="ck-box {% if item.is_done %}on{% endif %}" aria-hidden="true">
+          {% if item.is_done %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>{% endif %}
+        </span>
+        {% endif %}
+        <span class="ck-text">{{ item.text }}</span>
+        {% if can_edit %}
+        <span class="ck-acts">
+          <form method="post" action="{% url 'projects:checklist_move' item.pk %}">{% csrf_token %}
+            <input type="hidden" name="dir" value="up">
+            <button class="ck-mv" type="submit" aria-label="Move “{{ item.text }}” up" {% if forloop.first %}disabled{% endif %}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg></button></form>
+          <form method="post" action="{% url 'projects:checklist_move' item.pk %}">{% csrf_token %}
+            <input type="hidden" name="dir" value="down">
+            <button class="ck-mv" type="submit" aria-label="Move “{{ item.text }}” down" {% if forloop.last %}disabled{% endif %}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button></form>
+          <form method="post" action="{% url 'projects:checklist_delete' item.pk %}">{% csrf_token %}
+            <button class="ck-mv danger-text" type="submit" aria-label="Delete “{{ item.text }}”">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></form>
+        </span>
+        {% endif %}
+      </div>
+      {% empty %}
+      <p class="kan-empty">No checklist items yet.</p>
+      {% endfor %}
+    </div>
+    {% if can_edit %}
+    <form method="post" action="{% url 'projects:checklist_add' task.pk %}" class="inline-form" style="border-bottom:none;border-top:1px solid var(--line-2)">
+      {% csrf_token %}
+      <input name="text" placeholder="Add a checklist item…" required style="flex:1;min-width:160px" aria-label="Checklist item">
+      <button class="btn sm" type="submit">Add</button>
+    </form>
+    {% endif %}
+  </div>
+
+  {# ---------- dependencies ---------- #}
+  <div class="card">
+    <div class="card-h"><h3>Dependencies</h3>
+      {% if open_blockers %}<span class="tag danger">{{ open_blockers|length }} open</span>{% endif %}</div>
+    <div class="card-b">
+      <div class="fin-l">Blocked by</div>
+      {% if task.blocked_by.all %}
+      <ul class="dep-list">
+        {% for b in task.blocked_by.all %}
+        <li>
+          <span class="dep-dot {% if b.status == 'DONE' %}on{% endif %}"></span>
+          <a href="{% url 'projects:task_detail' b.pk %}">{{ b.title }}</a>
+          <span class="tag {% if b.status == 'DONE' %}ok{% else %}gray{% endif %}">{{ b.get_status_display }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="kan-empty">Nothing blocking this task.</p>{% endif %}
+
+      <div class="fin-l" style="margin-top:16px">Blocks</div>
+      {% if task.blocks.all %}
+      <ul class="dep-list">
+        {% for b in task.blocks.all %}
+        <li>
+          <span class="dep-dot {% if b.status == 'DONE' %}on{% endif %}"></span>
+          <a href="{% url 'projects:task_detail' b.pk %}">{{ b.title }}</a>
+          <span class="tag {% if b.status == 'DONE' %}ok{% else %}gray{% endif %}">{{ b.get_status_display }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="kan-empty">Nothing waiting on this task.</p>{% endif %}
+    </div>
+
+    {% if can_edit %}
+    <form method="post" action="{% url 'projects:task_deps_update' task.pk %}" class="dep-form">
+      {% csrf_token %}
+      <label class="fin-l" for="dep-pick">Pick blockers (same project)</label>
+      <select name="blocked_by" id="dep-pick" multiple size="6">
+        {% for c in candidate_blockers %}
+        <option value="{{ c.pk }}" {% if c in task.blocked_by.all %}selected{% endif %}>
+          {{ c.title }} — {{ c.get_status_display }}</option>
+        {% endfor %}
+      </select>
+      <p class="hint">Ctrl/Cmd-click to select more than one. Saving replaces the current set.</p>
+      <button class="btn sm" type="submit">Save dependencies</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+{# ---------- work log ---------- #}
+<div class="card" style="margin-top:18px" id="worklog">
+  <div class="card-h"><h3>Work logged</h3>
+    <span style="display:flex;gap:6px;flex-wrap:wrap">
+      <span class="tag gray">{{ logged_total|floatformat:"-2" }} h total</span>
+      {% if billable_total %}<span class="tag ok">{{ billable_total|floatformat:"-2" }} h billable</span>{% endif %}
+    </span>
+  </div>
+
+  {% if can_log_work %}
+  <form method="post" action="{% url 'projects:worklog_create' project.pk %}"
+        class="inline-form" enctype="multipart/form-data">
+    {% csrf_token %}
+    <input type="hidden" name="task" value="{{ task.pk }}">
+    <input type="hidden" name="next" value="{{ request.path }}">
+    <input type="date" name="date" value="{{ today|date:'Y-m-d' }}" required aria-label="Date">
+    <select name="category" aria-label="Category">
+      {% for value, label in worklog_categories %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+    </select>
+    <input name="description" placeholder="What got done?" required
+           style="flex:2;min-width:180px" aria-label="Description">
+    <input type="time" name="start_time" aria-label="Start time" title="Start time">
+    <input type="time" name="end_time" aria-label="End time" title="End time">
+    <input type="number" name="hours" step="0.25" min="0" placeholder="hrs"
+           style="width:74px" aria-label="Hours">
+    <label class="check-inline">
+      <input type="checkbox" name="is_billable" checked> Billable</label>
+    <button class="btn sm" type="submit">Log work</button>
+  </form>
+  <p class="hint" style="padding:0 20px 12px;margin:0">
+    Leave hours blank to compute them from start and end.</p>
+  {% endif %}
+
+  {% if task_logs %}
+  <div class="table-wrap">
+  <table class="ts-table">
+    <tbody>
+    {% for w in task_logs %}
+      <tr>
+        <td class="ts-when">{{ w.date|date:"d M Y" }}</td>
+        <td class="ts-what">
+          <strong>{{ w.description }}</strong>
+          <div class="ts-sub">
+            {% if w.logged_by %}{{ w.logged_by.get_full_name|default:w.logged_by.username }}{% else %}—{% endif %}
+            · {{ w.get_category_display }}
+            {% if w.start_time and w.end_time %} · {{ w.start_time|time:"H:i" }}–{{ w.end_time|time:"H:i" }}{% endif %}
+          </div></td>
+        <td class="ts-hours">{{ w.hours|floatformat:"-2" }} h</td>
+        <td class="ts-billable">
+          {% if w.is_billable %}<span class="tag ok">Billable</span>
+          {% else %}<span class="tag gray">Non-billable</span>{% endif %}</td>
+        <td class="ts-status">
+          {% if w.approval_status == 'APPROVED' %}<span class="tag ok">Approved</span>
+          {% elif w.approval_status == 'SUBMITTED' %}<span class="tag info">Awaiting approval</span>
+          {% elif w.approval_status == 'REJECTED' %}<span class="tag danger">Needs changes</span>
+          {% else %}<span class="tag gray">Draft</span>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <div class="card-b"><p class="kan-empty">No time logged against this task yet.</p></div>
+  {% endif %}
+</div>
+
+{# ---------- comments ---------- #}
+<div class="card" style="margin-top:18px">
+  <div class="card-h"><h3>Comments</h3>
+    <span class="tag gray">{{ task.comments.all|length }}</span></div>
+  <div class="card-b">
+    {% for c in task.comments.all %}
+    <div class="cm-row">
+      <div class="cm-avatar" aria-hidden="true">{% if c.author %}{{ c.author.get_full_name|default:c.author.username|slice:":1"|upper }}{% else %}·{% endif %}</div>
+      <div class="cm-body">
+        <div class="cm-head">
+          <strong>{% if c.author %}{{ c.author.get_full_name|default:c.author.username }}{% else %}System{% endif %}</strong>
+          <span class="cm-when">{{ c.created_at|date:"d M Y, H:i" }}</span>
+          {% if c.author_id == user.pk or can_delete %}
+          <form method="post" action="{% url 'projects:comment_delete' c.pk %}"
+                onsubmit="return confirm('Delete this comment?')">
+            {% csrf_token %}<button class="link-act muted" type="submit">Delete</button></form>
+          {% endif %}
+        </div>
+        <div class="cm-text">{{ c.body|linebreaksbr }}</div>
+      </div>
+    </div>
+    {% empty %}
+    <p class="kan-empty">No comments yet.</p>
+    {% endfor %}
+  </div>
+  <form method="post" action="{% url 'projects:comment_add' task.pk %}" class="cm-form">
+    {% csrf_token %}
+    <label class="sr-only" for="cm-body">Add a comment</label>
+    <textarea name="body" id="cm-body" rows="2" placeholder="Add a comment…" required></textarea>
+    <button class="btn sm" type="submit">Comment</button>
+  </form>
+</div>
+
+{# ---------- attachments ---------- #}
+<div class="card" style="margin-top:18px">
+  <div class="card-h"><h3>Attachments</h3>
+    <span class="tag gray">{{ task.attachments.all|length }}</span></div>
+  {% if can_edit %}
+  <form method="post" action="{% url 'projects:attachment_upload' task.pk %}"
+        enctype="multipart/form-data" class="inline-form upload-form">
+    {% csrf_token %}
+    <div class="file-pick" style="flex:1;min-width:200px">
+      <input type="file" name="file" required aria-label="File to attach">
+      <span class="upload-hint">Up to {{ max_upload_label }} · images are compressed automatically</span>
+    </div>
+    <button class="btn sm" type="submit">Upload</button>
+    {% include "_drive_fallback.html" with label_name="label" %}
+  </form>
+  {% endif %}
+  <div class="card-b">
+    {% if task.attachments.all %}
+    <div class="asset-grid">
+      {% for a in task.attachments.all %}
+      <div class="asset">
+        {% comment %}
+        Decorative and out of the tab order: the filename link directly below
+        goes to the same file, so this is a second stop announcing nothing. See
+        projects/_asset_card.html for the same treatment.
+        {% endcomment %}
+        <a class="asset-thumb {% if not a.is_image %}file{% endif %}" href="{{ a.url }}" target="_blank" rel="noopener{% if a.is_link %} noreferrer{% endif %}" tabindex="-1" aria-hidden="true">
+          {% if a.is_image %}<img src="{{ a.url }}" alt="">
+          {% elif a.is_link %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>
+          {% else %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>{% endif %}
+        </a>
+        <div class="asset-body">
+          <a href="{{ a.url }}" target="_blank" rel="noopener{% if a.is_link %} noreferrer{% endif %}">{{ a.filename|truncatechars:30 }}</a>
+          {% if a.is_link %}<span class="tag gray" title="Held on Drive, not on this server">link</span>{% endif %}
+          <span class="cm-when">{% if a.uploaded_by %}{{ a.uploaded_by.get_full_name|default:a.uploaded_by.username }}{% else %}—{% endif %} · {{ a.created_at|date:"d M Y" }}</span>
+          {% if can_edit %}
+          <form method="post" action="{% url 'projects:attachment_delete' a.pk %}"
+                onsubmit="return confirm('Remove this attachment?')">
+            {% csrf_token %}<button class="link-act muted" type="submit">Remove</button></form>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="kan-empty">No files attached.</p>
+    {% endif %}
+  </div>
+</div>
+
+{% endwith %}
+{% endblock %}

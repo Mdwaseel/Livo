@@ -1,0 +1,62 @@
+{% extends "client_calendar/review/_base.html" %}
+{% load client_calendar_tags %}
+{% block title %}Confirm it's you{% endblock %}
+
+{% block content %}
+{% comment %}
+Shown in place of any reviewer page until this browser has proved it belongs to
+the inbox the link was sent to. It names the reviewer's first name and a masked
+address and nothing else: whoever is reading may be the person the email was
+forwarded to, and the work itself stays behind the code.
+{% endcomment %}
+<section class="rv-verify">
+  <div class="rv-verify-card">
+    <span class="rv-verify-ico">{% cc_icon "shield" %}</span>
+    <p class="cc-eyebrow">{{ client.name }} · approvals</p>
+    <h1 class="rv-verify-title">{% if show_code %}Check your email{% else %}Confirm it's you{% endif %}</h1>
+
+    {% if state == "wrong" %}
+    <p class="rv-alert is-danger" role="alert">{% cc_icon "alert" %}<span>That code didn't match. Check the newest email from us and try again.</span></p>
+    {% elif state == "expired" %}
+    <p class="rv-alert" role="alert">{% cc_icon "clock" %}<span>That code has expired. Send yourself a new one — it only takes a moment.</span></p>
+    {% elif state == "locked" %}
+    <p class="rv-alert is-danger" role="alert">{% cc_icon "alert" %}<span>Too many tries with that code. Send a new one to continue.</span></p>
+    {% elif state == "throttled" %}
+    <p class="rv-alert is-danger" role="alert">{% cc_icon "alert" %}<span>Too many attempts. For your security, please wait 15 minutes and try again.</span></p>
+    {% elif state == "failed" %}
+    <p class="rv-alert is-danger" role="alert">{% cc_icon "alert" %}<span>We couldn't send the email just now. Please try again in a minute.</span></p>
+    {% elif state == "stale" %}
+    <p class="rv-alert" role="alert">{% cc_icon "refresh" %}<span>That page had been open for a while. Please try again.</span></p>
+    {% elif state == "cooldown" %}
+    <p class="rv-alert is-ok" role="status">{% cc_icon "email" %}<span>We sent a code moments ago — check your inbox, and your spam folder just in case.</span></p>
+    {% endif %}
+
+    {% if show_code %}
+      <p class="rv-lede">We sent a 6-digit code to <strong>{{ reviewer.masked_email }}</strong>. Enter it below and this device will be remembered for {{ remember_days }} days.</p>
+      <form method="post" action="{% url 'client_review:check_code' reviewer.token %}" class="rv-code-form">
+        <input type="hidden" name="form_key" value="{{ form_key }}">{# not csrf_token: see views_review #}
+        <input type="hidden" name="next" value="{{ next }}">
+        <label class="cc-sr" for="rv-code">6-digit code</label>
+        <input id="rv-code" class="rv-code" name="code" type="text" inputmode="numeric"
+               autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required autofocus
+               placeholder="000000" data-rv-code>
+        <button class="cc-btn cc-btn-primary rv-block" type="submit">Continue</button>
+      </form>
+      <form method="post" action="{% url 'client_review:send_code' reviewer.token %}" class="rv-resend">
+        <input type="hidden" name="form_key" value="{{ form_key }}">{# not csrf_token: see views_review #}
+        <input type="hidden" name="next" value="{{ next }}">
+        <button type="submit" class="rv-textbtn" data-rv-wait="{{ wait }}">Send a new code</button>
+      </form>
+    {% else %}
+      <p class="rv-lede">Hi {{ reviewer.first_name }}. This page is private to you, so the first time you open it on a device we'll email a short code to <strong>{{ reviewer.masked_email }}</strong>.</p>
+      <form method="post" action="{% url 'client_review:send_code' reviewer.token %}">
+        <input type="hidden" name="form_key" value="{{ form_key }}">{# not csrf_token: see views_review #}
+        <input type="hidden" name="next" value="{{ next }}">
+        <button class="cc-btn cc-btn-primary rv-block" type="submit">{% cc_icon "email" %}Email me a code</button>
+      </form>
+    {% endif %}
+
+    <p class="rv-fineprint">Not {{ reviewer.first_name }}? This link was meant for someone else. Ask {{ agency.agency_name|default:"Livo Digital" }} to send the work to you directly.</p>
+  </div>
+</section>
+{% endblock %}

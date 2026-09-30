@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block crumb %}<a href="{% url 'core:settings' %}">Agency settings</a> / Team{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h2>Team</h2><p>Assign roles, departments, designations and reporting lines.</p></div>
+  <a href="/admin/accounts/user/add/" class="btn ghost">+ Add user (admin)</a>
+</div>
+<div class="card">
+  <div class="table-wrap">
+  <table><thead><tr>
+    <th>Person</th><th>Primary role</th><th>Extra roles</th><th>Department</th><th>Designation</th><th>Reports to</th><th></th>
+  </tr></thead><tbody>
+  {% for u in users %}
+    <tr>
+      <td><strong>{{ u.get_full_name|default:u.username }}</strong>
+        {% if u.is_superuser %} <span class="tag ok" title="Bypasses all permission checks">super</span>{% endif %}
+        <div style="color:var(--ink-soft);font-size:12px">{{ u.email|default:u.username }}{% if u.employee_code %} · {{ u.employee_code }}{% endif %}</div></td>
+      <td>{% if u.primary_role %}<span class="tag">{{ u.primary_role.name }}</span>{% else %}<span class="tag warn">none</span>{% endif %}</td>
+      <td>{% for r in u.extra_roles.all %}<span class="tag gray">{{ r.name }}</span> {% empty %}—{% endfor %}</td>
+      <td>{{ u.department.name|default:"—" }}</td>
+      <td>{{ u.designation.name|default:"—" }}</td>
+      <td>{% if u.reports_to %}{{ u.reports_to.get_full_name|default:u.reports_to.username }}{% else %}—{% endif %}</td>
+      <td class="row-actions"><a href="{% url 'accounts:user_assign' u.pk %}">Assign</a></td>
+    </tr>
+  {% endfor %}
+  </tbody></table>
+  </div>
+</div>
+{% endblock %}

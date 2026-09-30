@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% load static client_calendar_tags %}
+{% block title %}{% if is_new %}Plan an activity{% else %}Edit activity{% endif %} · {{ client.name }}{% endblock %}
+{% block head %}<link rel="stylesheet" href="{% static 'css/client_calendar.css' %}"><link rel="stylesheet" href="{% static 'css/client_review.css' %}">{% endblock %}
+{% block crumb %}<a href="{% url 'client_calendar:index' %}">Client calendars</a> / <a href="{% url 'client_calendar:planner' client.pk %}">{{ client.name }}</a> / {% if is_new %}New activity{% else %}Edit{% endif %}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>{% if is_new %}Plan an activity{% else %}Edit “{{ activity.title }}”{% endif %}</h2>
+    <p>For {{ client.name }}. The title, details, platform and link are shown to the client exactly as you write them.</p>
+  </div>
+  {% if not is_new %}
+  <div class="page-actions">
+    {% if latest_approval %}
+    <a class="btn ghost" href="{{ latest_approval.get_absolute_url }}">{% cc_icon "badge_check" "" %}<span>Approval: {{ latest_approval.get_status_display|lower }}</span></a>
+    {% endif %}
+    {% if not latest_approval or latest_approval.status != 'APPROVED' %}
+    <a class="btn soft" href="{% url 'client_calendar:approval_create' activity.pk %}">{% cc_icon "send" "" %}<span>{% if latest_approval %}Send a new version{% else %}Ask for approval{% endif %}</span></a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% if errors %}
+<div class="msg error" role="alert">Some details need another look — they're marked below.</div>
+{% endif %}
+
+<form method="post" enctype="multipart/form-data" class="card cc-form" novalidate>
+  {% csrf_token %}
+  <div class="card-b">
+
+    <fieldset class="cc-fieldset">
+      <legend class="cc-flabel">What is it?</legend>
+      <div class="cc-kind-groups">
+        {% for group_label, kinds in kind_groups %}
+        <div>
+          <p class="cc-kind-group-l">{{ group_label }}</p>
+          <div class="cc-tiles">
+            {% for value, label in kinds %}
+            <label class="cc-tile">
+              <input type="radio" name="kind" value="{{ value }}"{% if form.kind == value %} checked{% endif %} required>
+              <span>{% cc_icon value|lower %}{{ label }}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% if errors.kind %}<p class="cc-error">{{ errors.kind }}</p>{% endif %}
+    </fieldset>
+
+    <div class="cc-row-3">
+      <div class="field{% if errors.project %} has-error{% endif %}">
+        <label for="f-project">Project</label>
+        <select id="f-project" name="project" required>
+          {% if projects|length != 1 %}<option value="">Choose…</option>{% endif %}
+          {% for project in projects %}<option value="{{ project.pk }}"{% if form.project == project.pk|stringformat:'s' %} selected{% endif %}>{{ project.name }}</option>{% endfor %}
+        </select>
+        {% if errors.project %}<p class="cc-error">{{ errors.project }}</p>{% endif %}
+      </div>
+      <div class="field{% if errors.platform %} has-error{% endif %}">
+        <label for="f-platform">Platform</label>
+        <select id="f-platform" name="platform">
+          <option value="">Not platform-specific</option>
+          {% for value, label in platforms %}<option value="{{ value }}"{% if form.platform == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+        {% if errors.platform %}<p class="cc-error">{{ errors.platform }}</p>{% endif %}
+      </div>
+      <div class="cc-when">
+        <div class="field{% if errors.date %} has-error{% endif %}">
+          <label for="f-date">Date</label>
+          <input id="f-date" type="date" name="date" value="{{ form.date }}" required>
+          {% if errors.date %}<p class="cc-error">{{ errors.date }}</p>{% endif %}
+        </div>
+        <div class="field{% if errors.time %} has-error{% endif %}">
+          <label for="f-time">Time <span class="cc-opt">optional</span></label>
+          <input id="f-time" type="time" name="time" value="{{ form.time }}">
+          {% if errors.time %}<p class="cc-error">{{ errors.time }}</p>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <fieldset class="cc-fieldset">
+      <legend class="cc-flabel">Status</legend>
+      <div class="cc-tiles">
+        {% for value, label in statuses %}
+        <label class="cc-tile cc-tile-status st-{{ value|lower }}">
+          <input type="radio" name="status" value="{{ value }}"{% if form.status == value %} checked{% endif %}>
+          <span><i class="cc-dot" aria-hidden="true"></i>{{ label }}</span>
+        </label>
+        {% endfor %}
+      </div>
+      <p class="hint" style="margin-top:8px">Need a sign-off? Save, then use “Ask for approval” — the client gets a private email link, and the status moves to “Awaiting client approval” and then “Approved by client” on its own.</p>
+      {% if errors.status %}<p class="cc-error">{{ errors.status }}</p>{% endif %}
+    </fieldset>
+
+    <div class="field{% if errors.title %} has-error{% endif %}" style="margin:0">
+      <label for="f-title">Title</label>
+      <input id="f-title" name="title" value="{{ form.title }}" maxlength="160" required
+             placeholder="e.g. Diwali offer reel, Retargeting budget increase">
+      {% if errors.title %}<p class="cc-error">{{ errors.title }}</p>{% endif %}
+    </div>
+
+    <div class="field" style="margin:0">
+      <label for="f-details">Details <span class="cc-opt">optional</span></label>
+      <textarea id="f-details" name="details" rows="4"
+                placeholder="The caption, what's changing in the campaign, or what the review covers.">{{ form.details }}</textarea>
+    </div>
+
+    <div class="row">
+      <div class="field{% if errors.link %} has-error{% endif %}" style="margin:0">
+        <label for="f-link">Link <span class="cc-opt">optional</span></label>
+        <input id="f-link" type="url" name="link" value="{{ form.link }}" inputmode="url"
+               placeholder="https://instagram.com/p/…">
+        <p class="hint">The live post, ad preview, report or Drive folder.</p>
+        {% if errors.link %}<p class="cc-error">{{ errors.link }}</p>{% endif %}
+      </div>
+      <div class="field{% if errors.preview %} has-error{% endif %}" style="margin:0">
+        <label for="f-preview">Preview image <span class="cc-opt">optional</span></label>
+        {% if activity.preview %}
+        <div class="cc-preview-now">
+          <img src="{{ activity.preview.url }}" alt="Current preview">
+          <label class="cc-check"><input type="checkbox" name="remove_preview"> Remove this image</label>
+        </div>
+        {% endif %}
+        <input id="f-preview" type="file" name="preview" accept="image/jpeg,image/png,image/webp">
+        <p class="hint">The creative or a screenshot. Shown as a thumbnail on the client's page.</p>
+        {% if errors.preview %}<p class="cc-error">{{ errors.preview }}</p>{% endif %}
+      </div>
+    </div>
+
+    <label class="cc-switch">
+      <input type="checkbox" name="show_to_client"{% if form.show_to_client %} checked{% endif %}>
+      <span><strong>Show on the client's calendar</strong>
+        <small>Untick to keep a draft or internal-only item off their page. It stays on your planner.</small></span>
+    </label>
+
+    {% comment %}
+    The update emails batch changes up. This is for the ones worth an email of
+    their own the moment they happen — "it's live, here's the link".
+    {% endcomment %}
+    <fieldset class="cc-fieldset cc-notify{% if errors.notify %} has-error{% endif %}" data-cc-notify>
+      <legend class="cc-sr">Tell the client</legend>
+      <label class="cc-switch">
+        <input type="checkbox" name="notify" data-cc-notify-toggle{% if notify.on %} checked{% endif %}>
+        <span><strong>Email the client about this now</strong>
+          <small>{% if is_new %}Let them know it's been planned{% else %}Tell them what changed — that it's posted, with the link, or moved to a new date{% endif %}. Leave it off and it goes in their next update email instead.</small></span>
+      </label>
+      <div class="cc-notify-body" data-cc-notify-body>
+        {% if notify_people %}
+        <div class="ap-people">
+          {% for p in notify_people %}
+          <label class="ap-person-opt{% if p.unsubscribed %} is-off{% endif %}">
+            <input type="checkbox" name="notify_people" value="{{ p.value }}"{% if p.value in notify.people and not p.unsubscribed %} checked{% endif %}{% if p.unsubscribed %} disabled{% endif %}>
+            <span class="ap-person-card">
+              <span class="ap-avatar" aria-hidden="true">{{ p.name|slice:":1"|upper }}</span>
+              <span class="ap-person-main">
+                <strong>{{ p.name }}</strong>
+                <small>{% if p.unsubscribed %}Turned off update emails{% else %}{{ p.email }}{% endif %}</small>
+              </span>
+              <span class="ap-check" aria-hidden="true">{% cc_icon "check" %}</span>
+            </span>
+          </label>
+          {% endfor %}
+        </div>
+        {% endif %}
+        <div class="row">
+          <div class="field" style="margin:0">
+            <label for="f-notify-emails">{% if notify_people %}Other emails{% else %}Email to{% endif %} <span class="cc-opt">separate with commas</span></label>
+            <input id="f-notify-emails" type="email" multiple name="notify_emails" value="{{ notify.emails }}" autocomplete="off"
+                   placeholder="name@company.com, another@company.com">
+          </div>
+          <div class="field" style="margin:0">
+            <label for="f-notify-note">Note <span class="cc-opt">optional</span></label>
+            <input id="f-notify-note" name="notify_note" value="{{ notify.note }}" maxlength="500"
+                   placeholder="e.g. It's live — thanks for the quick approval!">
+          </div>
+        </div>
+        {% if errors.notify %}<p class="cc-error">{{ errors.notify }}</p>{% endif %}
+        {% if wa_text %}
+        <p class="hint cc-notify-wa">Prefer WhatsApp? <a href="https://wa.me/?text={{ wa_text|urlencode:'' }}" target="_blank" rel="noopener noreferrer">{% cc_icon "whatsapp" "" %}Share it on WhatsApp</a> — uses what's saved now.</p>
+        {% endif %}
+      </div>
+    </fieldset>
+  </div>
+
+  <div class="cc-form-foot">
+    <button type="submit" class="btn">{% if is_new %}Add to calendar{% else %}Save changes{% endif %}</button>
+    {% if is_new %}<button type="submit" name="add_another" value="1" class="btn ghost">Add &amp; plan another</button>{% endif %}
+    <a class="btn ghost" href="{% url 'client_calendar:planner' client.pk %}?date={{ form.date|slice:':7' }}">Cancel</a>
+  </div>
+</form>
+
+{% if not is_new %}
+<form method="post" action="{% url 'client_calendar:activity_delete' activity.pk %}" class="cc-delete"
+      onsubmit="return confirm('Remove “{{ activity.title|escapejs }}” from the calendar? The client will no longer see it.')">
+  {% csrf_token %}
+  <button type="submit" class="link-danger">Remove this activity</button>
+</form>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}<script src="{% static 'js/client_review.js' %}" defer></script>{% endblock %}

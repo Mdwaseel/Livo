@@ -1,0 +1,51 @@
+{% extends "calendar_hub/_base.html" %}
+
+{% block heading %}Agenda{% endblock %}
+{% block lede %}{{ window.title }} — a flat list, in order, with the empty days left out.{% endblock %}
+
+{% block calendar %}
+{% comment %}
+Paged by fortnight rather than by event count. A page that stops halfway through
+a Tuesday reads as missing data, and "the next two weeks" is a period somebody
+can hold in their head. Empty days are omitted here — the opposite of the month
+grid, and for the opposite reason: a grid is a map, so its blank cells mean
+something, while an agenda is a list, and fourteen "nothing on Tuesday" rows are
+just scrolling.
+{% endcomment %}
+<div class="card">
+  <div class="card-h">
+    <h3>{{ window.start|date:"D d M" }} – {{ window.end|date:"D d M Y" }}</h3>
+    <span class="num">{{ total }} entr{{ total|pluralize:"y,ies" }} over {{ days|length }} day{{ days|length|pluralize }}</span>
+  </div>
+  <div class="card-b">
+    {% for day in days %}
+      <div class="agenda-day{% if day.is_today %} today{% endif %}{% if day.is_past %} past{% endif %}"
+           data-drop-date="{{ day.date|date:'Y-m-d' }}">
+        <div class="agenda-date">
+          <a href="{% url 'calendar_hub:day' %}?{{ querystring }}{% if querystring %}&{% endif %}date={{ day.date|date:'Y-m-d' }}">
+            <span class="dow">{{ day.date|date:"D" }}</span>
+            <span class="dom">{{ day.date|date:"j" }}</span>
+            <span class="mon">{{ day.date|date:"M" }}</span>
+          </a>
+          {% if day.is_today %}<span class="tag ok">Today</span>{% endif %}
+        </div>
+        <div class="ev-list" data-chip-slot>
+          {% for event in day.events %}
+            {% include "calendar_hub/_event_row.html" with event=event %}
+          {% endfor %}
+        </div>
+      </div>
+    {% empty %}
+      <div class="empty">
+        <h3>Nothing in this fortnight</h3>
+        <p>{% if query.is_filtered %}No entries match the current filters. Try clearing them.{% else %}Nothing is scheduled between {{ window.start|date:"d M" }} and {{ window.end|date:"d M" }}.{% endif %}</p>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="pager">
+  <a class="btn sm ghost" href="?{{ querystring }}{% if querystring %}&{% endif %}date={{ window.previous|date:'Y-m-d' }}">&larr; Previous {{ page_days }} days</a>
+  <a class="btn sm ghost" href="?{{ querystring }}{% if querystring %}&{% endif %}date={{ window.next|date:'Y-m-d' }}">Next {{ page_days }} days &rarr;</a>
+</div>
+{% endblock %}

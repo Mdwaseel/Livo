@@ -1,0 +1,2048 @@
+/* ============================================================
+   Livo OS — console design system
+   Brand: Livo green → teal gradient (the logo's dot), logo-black chrome,
+   light canvas.
+   Tokens follow design-system/livo-os/MASTER.md, adapted to brand.
+
+   Fonts are loaded from <link> tags in base.html / login.html, not an @import
+   here — an @import can only start downloading once this file has arrived,
+   which serialised the requests and delayed first paint.
+   ============================================================ */
+
+:root{
+  /* brand — sampled from the Livo logo: spring-green → teal dot, black mark */
+  --brand-green:#17e381;
+  --brand-teal:#00b8b0;
+  --brand-grad:linear-gradient(135deg,#17e381 0%,#0bd49a 50%,#00b8b0 100%);
+  /* semantic */
+  --primary:#00795b;          /* deep Livo green — 5.4:1 on white */
+  --primary-strong:#00614a;   /* hover */
+  --primary-soft:#e2f8ee;
+  --primary-ring:rgba(0,121,91,.22);
+  --accent:#eab24a;           /* attention only (pending, medium, low) — not brand */
+  --accent-soft:#fdf3df;
+  /* neutrals (near-black like the wordmark, faint green cast) */
+  --ink:#0b0f0d;
+  --ink-soft:#5b6560;
+  --ink-faint:#8a938e;
+  --line:#e3e7e5;
+  --line-2:#eef1ef;
+  --canvas:#f5f7f6;
+  --card:#ffffff;
+  /* status */
+  --ok:#128a48;      --ok-soft:#e3f5eb;
+  --warn:#a36908;    --warn-soft:#fdf1dd;
+  --danger:#c22f2f;  --danger-soft:#fbe9e9;
+  --info:#20657f;    --info-soft:#edf0ee;
+  /* chrome (sidebar / dark surfaces) — the logo's black */
+  --chrome:#0a0c0b;
+  --chrome-2:#121614;
+  --chrome-line:rgba(255,255,255,.07);
+  --chrome-ink:#a4ada8;
+  /* shape & motion */
+  --radius:12px; --radius-sm:8px;
+  --shadow-1:0 1px 2px rgba(11,15,13,.05);
+  --shadow-2:0 8px 28px rgba(11,15,13,.09);
+  --shadow-pop:0 16px 44px rgba(11,15,13,.16);
+  --speed:.18s;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --display:'Poppins','Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+/* The `hidden` attribute is only `display:none` in the UA stylesheet, which any
+   class rule with its own `display` silently beats. That is how the calendar's
+   day panel — `.day-panel{display:flex}` with `hidden` set — ended up parked
+   empty at the bottom of every month view: the markup said hidden, the
+   stylesheet said flex, and the stylesheet won.
+   Every JS-toggled element in this app uses `.hidden = true/false`, so the fix
+   belongs here once rather than as a `.thing[hidden]{display:none}` guard beside
+   each component that someone has to remember to write. `!important` is load
+   bearing: it is what makes the attribute outrank a later `display` again. */
+[hidden]{display:none!important}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);background:var(--canvas);color:var(--ink);
+  font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{font:inherit;cursor:pointer}
+::selection{background:rgba(23,227,129,.28)}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:4px}
+
+/* ---------- app shell ---------- */
+/* minmax(0,1fr), not 1fr: a bare 1fr floors at the column's min-content width,
+   so one wide data table stretched the whole main column past the viewport and
+   the page scrolled sideways, pushing the topbar actions off screen. */
+.layout{display:grid;grid-template-columns:236px minmax(0,1fr);min-height:100vh}
+.side{background:var(--chrome);color:var(--chrome-ink);display:flex;flex-direction:column;
+  position:sticky;top:0;height:100vh;border-right:1px solid rgba(0,0,0,.25);z-index:30}
+.side::before{content:"";position:absolute;inset:0 0 auto 0;height:190px;pointer-events:none;
+  background:radial-gradient(420px 190px at 18% -40%,rgba(23,227,129,.28),transparent 70%)}
+.brand{padding:22px 18px 16px;position:relative}
+.brand img{display:block;width:124px;height:auto}
+.brand small{display:block;margin-top:7px;font-size:9.5px;font-weight:600;color:#737a76;
+  letter-spacing:.22em;text-transform:uppercase}
+.nav{padding:10px 12px;flex:1;overflow-y:auto}
+.nav a{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:9px;
+  font-weight:500;color:var(--chrome-ink);margin-bottom:2px;font-size:13.5px;
+  transition:background var(--speed),color var(--speed)}
+.nav a svg{width:17px;height:17px;flex:none;opacity:.75}
+.nav a:hover{background:rgba(255,255,255,.06);color:#fff}
+.nav a.active{background:linear-gradient(120deg,rgba(23,227,129,.25),rgba(23,227,129,.12));
+  color:#fff;box-shadow:inset 0 0 0 1px rgba(23,227,129,.35)}
+.nav a.active svg{opacity:1;color:var(--brand-green)}
+.nav .grp{font-size:10px;letter-spacing:.16em;text-transform:uppercase;
+  color:#888d8a;padding:18px 12px 6px;font-weight:700}
+.side-foot{padding:14px 18px;border-top:1px solid var(--chrome-line);font-size:12.5px}
+.side-foot .u{color:#fff;font-weight:600;overflow-wrap:anywhere}
+/* "My profile" and "Sign out" sat side by side separated only by a source
+   newline, so they read as one run of text. */
+.side-foot .links{display:flex;align-items:center;gap:10px;margin-top:3px}
+.side-foot .links::before{content:none}
+.side-foot .sep{color:#515754}
+.side-foot a{color:#848a87;transition:color var(--speed)}
+.side-foot a:hover{color:var(--brand-green)}
+
+.main{display:flex;flex-direction:column;min-width:0}
+.topbar{height:60px;background:rgba(255,255,255,.85);backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;
+  justify-content:space-between;padding:0 28px;position:sticky;top:0;z-index:5}
+.topbar .m-logo{display:none}
+.topbar-actions{display:flex;align-items:center;gap:12px;flex:none}
+.crumb{color:var(--ink-soft);font-size:12.5px;min-width:0;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;flex:1}
+.crumb a{transition:color var(--speed)}
+.crumb a:hover{color:var(--primary)}
+.content{padding:30px 32px;max-width:1180px;width:100%}
+/* The skip link's target. Focusing a <main> to move the caret there would
+   otherwise paint a ring around the entire page. */
+.content:focus{outline:none}
+
+/* Off-screen until focused, then a real control in the top-left. Positioned
+   fixed so it clears the sticky topbar rather than opening underneath it. */
+.skip-link{position:fixed;top:-100px;left:12px;z-index:100;
+  background:var(--primary);color:#fff;padding:10px 16px;border-radius:0 0 9px 9px;
+  font-size:13px;font-weight:600;box-shadow:var(--shadow-pop);
+  transition:top var(--speed)}
+.skip-link:focus{top:0}
+
+/* Hamburger + scrim: the sidebar is the only navigation, so below 900px it
+   becomes a drawer rather than simply disappearing. Both are display:none on
+   desktop and switched on in the responsive block at the end of this file. */
+.nav-toggle{display:none;align-items:center;justify-content:center;width:38px;
+  height:38px;flex:none;margin-left:-6px;border:none;background:none;
+  border-radius:9px;color:var(--ink);cursor:pointer;
+  transition:background var(--speed)}
+.nav-toggle:hover{background:var(--primary-soft);color:var(--primary-strong)}
+.nav-toggle svg{width:21px;height:21px}
+.scrim{display:none;position:fixed;inset:0;z-index:25;background:rgba(6,8,7,.5);
+  backdrop-filter:blur(2px);border:none;padding:0;cursor:pointer}
+/* Closes the drawer on navigation without needing JS on every link. */
+.side .side-close{display:none}
+
+/* ---------- buttons ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  background:var(--primary);color:#fff;padding:9px 16px;border-radius:9px;
+  font-weight:600;font-size:13px;border:none;cursor:pointer;line-height:1.4;
+  transition:background var(--speed),box-shadow var(--speed),transform var(--speed)}
+.btn:hover{background:var(--primary-strong);box-shadow:0 4px 14px rgba(0,121,91,.28)}
+.btn:active{transform:translateY(1px)}
+.btn svg{width:15px;height:15px}
+.btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--line);box-shadow:var(--shadow-1)}
+.btn.ghost:hover{border-color:var(--primary);color:var(--primary);background:#fff;box-shadow:var(--shadow-1)}
+.btn.soft{background:var(--primary-soft);color:var(--primary-strong)}
+.btn.soft:hover{background:#cff2e1;box-shadow:none}
+.btn.warn{background:var(--accent);color:#4a3405}
+.btn.warn:hover{background:#e0a63c;box-shadow:0 4px 14px rgba(234,178,74,.35)}
+.btn.sm{padding:6px 12px;font-size:12.5px;border-radius:8px}
+.btn.danger{background:var(--danger);color:#fff}
+.btn.danger:hover{background:#a82626;box-shadow:0 4px 14px rgba(194,47,47,.3)}
+.btn[disabled]{opacity:.55;cursor:not-allowed;box-shadow:none}
+
+/* ---------- bulk selection ---------- */
+.bulk-bar{display:flex;align-items:center;gap:12px;margin-bottom:14px;
+  padding:10px 14px;background:var(--danger-soft);border:1px solid #f0cccc;
+  border-radius:10px}
+.bulk-bar .count{font-size:13px;font-weight:600;color:var(--danger);margin-right:auto}
+th.chk,td.chk{width:34px;text-align:center;padding-right:0}
+th.chk input,td.chk input{width:15px;height:15px;cursor:pointer;
+  accent-color:var(--primary);vertical-align:middle}
+td.row-actions{white-space:nowrap;text-align:right}
+td.row-actions a{font-size:12px;font-weight:600;color:var(--primary)}
+
+/* ---------- employees ---------- */
+.emp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+.emp-card{display:flex;gap:12px;align-items:flex-start;padding:14px;
+  background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow-1);color:inherit;text-decoration:none;
+  transition:border-color var(--speed),box-shadow var(--speed)}
+.emp-card:hover{border-color:var(--primary);box-shadow:0 4px 14px rgba(0,121,91,.15)}
+/* Offboarded: still listed, visibly not current. The photo desaturates rather
+   than the whole card fading, so the status tags stay legible. */
+.emp-card.is-inactive{background:#fbfcfc}
+.emp-card.is-inactive .emp-avatar{filter:grayscale(1);opacity:.65}
+.emp-card.is-inactive .emp-body>strong{color:var(--ink-soft)}
+.emp-avatar{width:44px;height:44px;border-radius:50%;flex:none;overflow:hidden;
+  background:var(--primary-soft);color:var(--primary-strong);
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:17px}
+.emp-avatar img{width:100%;height:100%;object-fit:cover}
+.emp-avatar.lg{width:64px;height:64px;font-size:24px}
+.emp-body strong{font-size:14px}
+.emp-meta{color:var(--ink-soft);font-size:12.5px;margin-top:2px}
+.emp-head{display:flex;align-items:center;gap:16px;min-width:0}
+.emp-head h2{overflow-wrap:anywhere}
+.card.sensitive{border-color:#ecd9b0}
+.card.sensitive .card-h{background:#fdf6e7;border-radius:var(--radius) var(--radius) 0 0}
+
+/* ---------- danger zone (offboard / delete an employee) ----------
+   Coloured like the other status surfaces rather than shouted in red: the
+   offboard inside it is reversible and routine, and a panel that looks like an
+   emergency every time somebody leaves gets ignored by the time it matters.
+   The one irreversible control is the only thing wearing .btn.danger. */
+.danger-zone{margin-top:18px;border-color:#f0d5d5}
+.danger-zone .card-h{background:var(--danger-soft);
+  border-radius:var(--radius) var(--radius) 0 0;border-bottom-color:#f0d5d5}
+.danger-zone .card-h h3{color:var(--danger)}
+.danger-zone .hint{margin-top:4px;line-height:1.6;max-width:64ch}
+.danger-zone .hint b{color:var(--ink);font-weight:700}
+.danger-zone code{font-family:var(--mono);font-size:12px;background:#eff0f0;
+  padding:1px 5px;border-radius:4px;color:var(--ink)}
+.dz-blocked{color:var(--warn);background:var(--warn-soft);border-radius:9px;
+  padding:11px 14px;font-size:13px;line-height:1.6;max-width:70ch}
+.dz-row{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;
+  flex-wrap:wrap}
+.dz-form>div:first-child{margin-bottom:12px}
+.dz-fields{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.dz-f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.dz-f-wide{flex:1 1 260px}
+.dz-f>span{font-size:11px;font-weight:700;letter-spacing:.05em;
+  text-transform:uppercase;color:var(--ink-faint)}
+/* The label is uppercased; the username inside it must not be. "Type ANSIL.K"
+   above a field wanting `ansil.k` is the label lying about the value. */
+.dz-f>span code{text-transform:none;letter-spacing:0}
+.dz-f input,.dz-f select{width:100%;padding:8px 11px;border:1px solid var(--line);
+  border-radius:8px;background-color:#fff;font:inherit;font-size:13px;color:var(--ink);
+  transition:border-color var(--speed),box-shadow var(--speed)}
+.dz-f select{padding-right:30px}
+.dz-f input:focus,.dz-f select:focus{outline:none;border-color:var(--primary);
+  box-shadow:0 0 0 3px var(--primary-ring)}
+/* The permanent delete is separated from the reversible action above it by a
+   real rule, so the two are never one continuous list of buttons. */
+.dz-split{margin-top:18px;padding-top:16px;border-top:1px solid var(--line-2)}
+.dz-split .dz-fields{margin-top:12px}
+/* Skills / role chips need real gaps — they were separated by a literal space
+   in the markup, which collapses to nothing once a row wraps. */
+.chip-row{display:flex;flex-wrap:wrap;gap:6px}
+
+/* ---------- cards / stats ---------- */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow-1)}
+.card-h{padding:15px 20px;border-bottom:1px solid var(--line-2);
+  display:flex;align-items:center;justify-content:space-between;gap:12px}
+.card-h h3{font-size:13.5px;font-weight:700;letter-spacing:-.01em}
+.card-b{padding:20px}
+/* auto-fit, not a fixed 4: the dashboard renders SIX tiles for users with
+   finance visibility, which left the last two stretched across a half-empty
+   second row. The 160px floor is sized so all six still fit on one desktop
+   row, and four tiles simply spread wider. */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  gap:16px;margin-bottom:24px}
+.stat .n{overflow-wrap:anywhere}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:18px 20px;box-shadow:var(--shadow-1);position:relative;overflow:hidden;
+  transition:box-shadow var(--speed),transform var(--speed)}
+.stat:hover{box-shadow:var(--shadow-2);transform:translateY(-1px)}
+.stat .bar{height:3px;width:30px;border-radius:2px;background:var(--brand-grad);margin-bottom:13px}
+.stat .n{font-size:30px;font-weight:800;letter-spacing:-.03em;font-family:var(--mono)}
+.stat .l{font-size:11px;color:var(--ink-soft);text-transform:uppercase;
+  letter-spacing:.1em;margin-top:3px;font-weight:600}
+
+/* ---------- tables ---------- */
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--ink-soft);padding:10px 20px;border-bottom:1px solid var(--line-2);font-weight:700}
+td{padding:13px 20px;border-bottom:1px solid var(--line-2)}
+tr:last-child td{border-bottom:none}
+tbody tr{transition:background var(--speed)}
+tbody tr:hover td{background:#f8f9f8}
+td a:hover strong{color:var(--primary)}
+.num{font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+
+/* Data tables are 6-7 columns wide and were clipped by their card on narrow
+   screens with no way to reach the rest. Scroll them in place instead of
+   letting the page itself scroll sideways. */
+.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.table-wrap>table{min-width:560px}
+@media(max-width:620px){
+  th{padding:9px 14px}
+  td{padding:11px 14px}
+}
+
+/* ---------- tags / status ---------- */
+/* nowrap: a two-word status like "In Review" was breaking across lines inside
+   the pill, which stretched the row and looked like a rendering fault. */
+.tag{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;
+  padding:3px 10px;border-radius:20px;white-space:nowrap;
+  background:var(--primary-soft);color:var(--primary-strong)}
+.tag.gray{background:#eff0f0;color:var(--ink-soft)}
+.tag.ok{background:var(--ok-soft);color:var(--ok)}
+.tag.warn{background:var(--warn-soft);color:var(--warn)}
+.tag.danger{background:var(--danger-soft);color:var(--danger)}
+.tag.info{background:var(--info-soft);color:var(--info)}
+.tag .dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+
+/* status stepper (Draft → Review → Approved → Sent) */
+.stepper{display:flex;align-items:center;gap:0;font-size:11px;font-weight:600;
+  color:var(--ink-faint);user-select:none;flex-wrap:wrap}
+.step{display:flex;align-items:center;gap:6px}
+.step .pip{width:9px;height:9px;border-radius:50%;background:#dbdfdd;
+  box-shadow:0 0 0 3px transparent;transition:background var(--speed),box-shadow var(--speed)}
+.step.done .pip{background:var(--primary)}
+.step.now .pip{background:var(--primary);box-shadow:0 0 0 3px var(--primary-ring)}
+.step.now{color:var(--ink)}
+.step.done{color:var(--ink-soft)}
+.step-line{width:26px;height:1.5px;background:var(--line);margin:0 8px}
+.step.done + .step-line,.step-line.done{background:var(--primary)}
+
+/* ---------- page furniture ---------- */
+.page-head{display:flex;align-items:flex-start;justify-content:space-between;
+  gap:16px;margin-bottom:24px;flex-wrap:wrap}
+.page-head h2{font-family:var(--display);font-size:23px;font-weight:700;letter-spacing:-.02em}
+.page-head p{color:var(--ink-soft);margin-top:3px}
+.page-head>div{min-width:0}
+/* The action cluster beside a page title. Wraps instead of overflowing once
+   two or three buttons sit next to a long project name. */
+.page-actions{display:flex;flex-wrap:wrap;gap:10px;flex:none}
+.grid-2{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:18px}
+.divider{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);
+  font-weight:700;margin:22px 0 10px}
+.empty{text-align:center;padding:48px 20px;color:var(--ink-soft)}
+.empty h3{color:var(--ink);font-size:15px;margin-bottom:5px;font-weight:700}
+.empty img{width:44px;opacity:.5;margin-bottom:12px}
+.msg{padding:11px 15px;border-radius:9px;margin-bottom:16px;font-size:13px;font-weight:500;
+  background:var(--info-soft);color:var(--info)}
+.msg.success{background:var(--ok-soft);color:var(--ok)}
+.msg.error{background:var(--danger-soft);color:var(--danger)}
+
+/* ---------- forms ---------- */
+.field{margin-bottom:16px}
+.field label{display:block;font-size:12.5px;font-weight:600;margin-bottom:6px}
+/* :not(...) matters: the blanket `width:100%` + text padding used to hit
+   checkboxes too, blowing a tickbox up into a full-width 40px block. Templates
+   were patching that one at a time with inline style="width:auto". */
+.field input:not([type=checkbox]):not([type=radio]),
+.field textarea,.field select,.search input{width:100%;padding:9px 13px;
+  border:1px solid var(--line);border-radius:9px;font:inherit;font-size:13.5px;
+  background:#fff;color:var(--ink);transition:border-color var(--speed),box-shadow var(--speed)}
+.field input:focus,.field textarea:focus,.field select:focus,.search input:focus{
+  outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-ring)}
+.field input[type=checkbox],.field input[type=radio]{width:16px;height:16px;
+  accent-color:var(--primary);vertical-align:middle;cursor:pointer}
+.field textarea{min-height:96px;resize:vertical}
+.field .hint{font-size:11.5px;color:var(--ink-soft);margin-top:5px}
+.field input[disabled],.field select[disabled],.field input[readonly]{
+  background:#f6f7f6;color:var(--ink-soft);cursor:not-allowed}
+
+/* File inputs: the native control ignores padding on the wrapper, so style the
+   button part and keep the box the same height as a text field. */
+.field input[type=file],.inline-form input[type=file],.ts-form input[type=file]{
+  padding:6px;font-size:12.5px;cursor:pointer}
+input[type=file]::file-selector-button{font:inherit;font-size:12.5px;font-weight:600;
+  margin-right:10px;padding:6px 12px;border:none;border-radius:7px;cursor:pointer;
+  background:var(--primary-soft);color:var(--primary-strong);
+  transition:background var(--speed)}
+input[type=file]::file-selector-button:hover{background:#cff2e1}
+
+/* One chevron treatment for every select in the app. Only .row-edit had it
+   before, so form and filter selects fell back to the raw OS control and
+   looked like they belonged to a different product. */
+.field select,.filters select,.inline-form select,.filter-bar select,
+.dep-form select,.ts-form select,.nd-f select,.pr-f select,.dz-f select{appearance:none;cursor:pointer;
+  padding-right:30px;
+  background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235d6f6e' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 9px center;
+  background-size:14px}
+.field select[multiple]{appearance:auto;background-image:none;padding-right:13px}
+
+.row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+.filters{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.filters select{padding:8px 12px;border:1px solid var(--line);border-radius:9px;
+  font:inherit;font-size:13px;background-color:#fff;color:var(--ink);cursor:pointer;
+  transition:border-color var(--speed),box-shadow var(--speed)}
+.filters select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-ring)}
+.search{position:relative;width:250px;max-width:100%}
+.search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);
+  width:14px;height:14px;color:var(--ink-faint);pointer-events:none}
+.search input{padding-left:32px}
+@media(max-width:520px){.search{width:100%}.filters{gap:8px}}
+
+/* ---------- dropdown menu (details) ---------- */
+details.menu{position:relative}
+details.menu summary{list-style:none}
+details.menu summary::-webkit-details-marker{display:none}
+/* Offset from the summary's own height, not a hardcoded 46px — that assumed a
+   full-size .btn trigger and left a gap under smaller ones like .link-act. */
+details.menu .pop{position:absolute;right:0;top:calc(100% + 8px);
+  width:290px;max-width:calc(100vw - 32px);max-height:min(60vh,420px);
+  overflow-y:auto;z-index:20;
+  background:#fff;border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow-pop);padding:10px;animation:pop .16s ease}
+details.menu .pop a{display:block;padding:8px 11px;border-radius:7px;font-weight:500;
+  transition:background var(--speed),color var(--speed)}
+details.menu .pop a:hover{background:var(--primary-soft);color:var(--primary-strong)}
+details.menu .pop .divider{margin:10px 8px 4px}
+@keyframes pop{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){details.menu .pop{animation:none}}
+
+/* ---------- "new document" panel ----------
+   A panel that asks two questions, not a menu of links, so it gets a heading,
+   real field spacing and a full-width action rather than the inline styles and
+   a small button it was assembled from. */
+/* Qualified with `details.menu` so it outranks the generic `.pop` width above
+   — a bare `.nd-pop` loses to it on specificity and silently does nothing. */
+details.menu .pop.nd-pop{width:328px;padding:16px}
+.nd-h{font-size:13.5px;font-weight:700;letter-spacing:-.01em;margin-bottom:14px;
+  padding-bottom:11px;border-bottom:1px solid var(--line-2)}
+.nd-f{margin-bottom:12px}
+.nd-f label{display:block;margin-bottom:5px}
+.nd-f select{width:100%;padding:9px 32px 9px 12px;border:1px solid var(--line);
+  /* background-COLOR, not the shorthand: the shorthand resets background-image
+     too, which silently erased the chevron the appearance:none rule draws. */
+  border-radius:9px;background-color:#fff;font:inherit;font-size:13px;color:var(--ink);
+  transition:border-color var(--speed),box-shadow var(--speed)}
+.nd-f select:focus{outline:none;border-color:var(--primary);
+  box-shadow:0 0 0 3px var(--primary-ring)}
+.nd-note{font-size:11.5px;line-height:1.55;color:var(--ink-soft);margin:0 0 12px;
+  min-height:34px}
+/* The line changes as the two selects fill in, and turns brand-coloured once it
+   is naming a real document — a disabled button needs to say what would unlock
+   it, and then confirm what it will do. */
+.nd-note.is-ready{color:var(--primary-strong);font-weight:600}
+.nd-go{width:100%}
+
+/* ---------- editor / autosave ---------- */
+.savebar{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--ink-soft)}
+.savebar .pulse{width:7px;height:7px;border-radius:50%;background:var(--ink-faint);
+  transition:background var(--speed)}
+.savebar.saving .pulse{background:var(--accent);animation:blink 1s infinite}
+.savebar.saved .pulse{background:var(--ok)}
+.savebar.error .pulse{background:var(--danger)}
+@keyframes blink{50%{opacity:.35}}
+.ql-toolbar.ql-snow{border-color:var(--line);border-radius:9px 9px 0 0;background:#fafcfb}
+.ql-container.ql-snow{border-color:var(--line);border-radius:0 0 9px 9px;
+  font-family:var(--sans);font-size:14px}
+.vrow{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;
+  padding:10px 0;border-bottom:1px solid var(--line-2)}
+.vrow:last-child{border-bottom:none}
+
+/* ---------- auth (login) ---------- */
+.auth-body{min-height:100vh;display:grid;place-items:center;background:var(--chrome);position:relative;overflow:hidden}
+.auth-body::before,.auth-body::after{content:"";position:absolute;border-radius:50%;
+  filter:blur(90px);opacity:.4;pointer-events:none}
+.auth-body::before{width:480px;height:480px;background:#0e8a5a;top:-160px;left:-120px}
+.auth-body::after{width:420px;height:420px;background:#007c78;bottom:-170px;right:-110px}
+.auth-card{background:var(--chrome-2);border:1px solid var(--chrome-line);border-radius:16px;
+  padding:38px 36px;width:min(380px,92vw);box-shadow:0 30px 80px rgba(0,0,0,.5);
+  position:relative;z-index:1}
+.auth-card img{width:150px;display:block;margin-bottom:10px}
+.auth-card .sub{color:#969c99;font-size:13px;margin:6px 0 26px}
+.auth-card label{display:block;font-size:12px;font-weight:600;color:#cbcfcd;margin-bottom:6px}
+.auth-card input{width:100%;padding:11px 13px;border:1px solid rgba(255,255,255,.12);
+  border-radius:9px;font:inherit;font-size:14px;margin-bottom:16px;background:rgba(255,255,255,.06);
+  color:#fff;transition:border-color var(--speed),box-shadow var(--speed)}
+.auth-card input:focus{outline:none;border-color:var(--brand-green);
+  box-shadow:0 0 0 3px rgba(23,227,129,.22)}
+.auth-card button{width:100%;background:var(--brand-grad);color:#0a0c0b;border:none;
+  padding:12px;border-radius:9px;font-weight:700;font-size:14px;
+  transition:filter var(--speed),transform var(--speed)}
+.auth-card button:hover{filter:brightness(1.06)}
+.auth-card button:active{transform:translateY(1px)}
+.auth-card .err{background:rgba(194,47,47,.18);color:#f1a8a8;padding:10px 12px;
+  border-radius:8px;font-size:12.5px;margin-bottom:16px;border:1px solid rgba(194,47,47,.3)}
+.auth-card .note{background:rgba(23,227,129,.14);color:#9af0c4;padding:10px 12px;
+  border-radius:8px;font-size:12.5px;margin-bottom:16px;border:1px solid rgba(23,227,129,.28)}
+
+/* Show/hide password. The button is layered over the input's right edge, so the
+   field keeps padding for it whether or not the script that adds it ran. */
+.auth-card .pw-wrap{position:relative}
+.auth-card .pw-wrap input{padding-right:44px}
+/* Scoped to .auth-card so these beat `.auth-card button`, which is the
+   full-width gradient submit and would otherwise swallow the icon button. */
+.auth-card .pw-toggle{position:absolute;top:0;right:0;width:42px;height:44px;
+  display:flex;align-items:center;justify-content:center;background:none;
+  border:none;padding:0;color:#848a87;cursor:pointer;border-radius:0 9px 9px 0;
+  transition:color var(--speed)}
+.auth-card .pw-toggle:hover{color:var(--brand-green);background:none;filter:none}
+.auth-card .pw-toggle:active{transform:none}
+.auth-card .pw-toggle svg{width:18px;height:18px}
+.auth-card .pw-toggle:focus-visible{outline:2px solid var(--brand-green);outline-offset:-2px}
+
+/* One-time code: monospaced and widely tracked so a six-digit string is easy to
+   proof-read against the email. */
+.auth-card .otp-input{font-family:var(--mono,"JetBrains Mono",monospace);
+  font-size:22px;letter-spacing:.42em;text-align:center;padding-left:.42em}
+/* The sign-in code, shown on screen in place of the email it used to arrive in. */
+.auth-card .otp-display{display:flex;flex-direction:column;align-items:center;gap:6px;
+  margin-bottom:18px;padding:16px 12px;border-radius:10px;
+  background:rgba(23,227,129,.08);border:1px dashed rgba(23,227,129,.45)}
+.auth-card .otp-display-label{font-size:10.5px;font-weight:700;letter-spacing:.16em;
+  text-transform:uppercase;color:#9af0c4}
+.auth-card .otp-display-code{font-family:var(--mono);font-size:28px;font-weight:600;
+  letter-spacing:.32em;padding-left:.32em;color:#fff;user-select:all}
+.auth-links{display:flex;justify-content:flex-end;margin:-8px 0 18px}
+.auth-links a{color:#848a87;font-size:12.5px;transition:color var(--speed)}
+.auth-links a:hover{color:var(--brand-green)}
+.auth-inline{margin-top:12px;text-align:center}
+.auth-inline .linkish{width:auto;background:none;border:none;padding:0;color:#848a87;
+  font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
+.auth-inline .linkish:hover{color:var(--brand-green);filter:none}
+.auth-inline .linkish:disabled{color:#515754;cursor:default}
+.auth-foot{margin:16px 0 0;color:#848a87;font-size:12px;line-height:1.65;text-align:center}
+.auth-foot a{color:var(--brand-green)}
+.auth-body-text{color:#a6aca9;font-size:13.5px;line-height:1.7;margin:0 0 14px}
+.auth-hints{color:#848a87;font-size:11.5px;line-height:1.6;margin:-6px 0 18px}
+.auth-hints ul{margin:0;padding-left:16px}
+.auth-button{display:block;text-align:center;background:var(--brand-grad);color:#0a0c0b;
+  padding:12px;border-radius:9px;font-weight:700;font-size:14px;margin-top:8px}
+.auth-card strong{color:#cbcfcd}
+
+/* ---------- upload limit + Drive-link fallback ---------- */
+.upload-hint{display:block;color:var(--ink-faint);font-size:11px;margin-top:4px;line-height:1.5}
+.file-pick{display:flex;flex-direction:column;justify-content:center}
+.upload-error{display:none;color:var(--danger,#c22f2f);font-size:11.5px;font-weight:600;
+  margin-top:4px;line-height:1.5}
+.upload-error.on{display:block}
+/* Full-width inside the flex .inline-form rows so it drops onto its own line
+   rather than squeezing between the file input and the button. */
+.drive-fallback{flex-basis:100%;width:100%;margin-top:4px;padding:12px 14px;
+  background:var(--primary-soft,rgba(23,227,129,.08));border:1px dashed var(--line);
+  border-radius:10px}
+.drive-fallback-h{display:flex;align-items:center;gap:7px;font-size:12.5px;
+  font-weight:700;color:var(--ink)}
+.drive-fallback-h svg{width:15px;height:15px;flex:none;color:var(--primary-strong,#0e8a5a)}
+.drive-fallback p{margin:5px 0 9px;color:var(--ink-soft);font-size:11.5px;line-height:1.6}
+.drive-fallback input{display:block;width:100%;margin-bottom:7px}
+.drive-fallback input:last-child{margin-bottom:0}
+
+/* ---------- analytics ---------- */
+/* Sub-navigation between the five analytics views. A row of links, not tabs
+   with JS — each is a real URL so filters survive a bookmark and a browser
+   back press does the obvious thing. */
+.subnav{display:flex;gap:4px;flex-wrap:wrap;margin:-6px 0 18px;
+  border-bottom:1px solid var(--line);padding-bottom:0}
+.subnav a{padding:9px 14px;font-size:13px;font-weight:600;color:var(--ink-soft);
+  border-bottom:2px solid transparent;margin-bottom:-1px;
+  transition:color var(--speed),border-color var(--speed)}
+.subnav a:hover{color:var(--ink)}
+.subnav a.on{color:var(--primary);border-bottom-color:var(--primary)}
+.subnav a:focus-visible{outline:2px solid var(--primary);outline-offset:-2px;
+  border-radius:6px 6px 0 0}
+
+.filter-card{margin-bottom:18px;overflow:hidden}
+.filter-card .filter-bar{border-bottom:none}
+/* Label above input, so the filter bar reads as six labelled controls rather
+   than a row of unexplained boxes. */
+.fb-field{display:flex;flex-direction:column;gap:3px}
+.fb-field>span{font-size:10px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.09em;color:var(--ink-faint)}
+.fb-field select,.fb-field input{min-width:0;max-width:190px}
+.head-actions{display:flex;gap:8px;flex:none}
+
+.chart-grid{display:grid;gap:16px;
+  grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
+.chart-card{margin:0}
+/* Fixed height reserved before Chart.js runs: a canvas that sizes itself after
+   the script loads shifts everything under it (CLS). */
+.chart-figure{position:relative;margin:0;width:100%}
+.chart-figure canvas{position:absolute;inset:0;width:100%!important;height:100%!important}
+.chart-caption{margin-top:12px;font-size:11.5px;line-height:1.6;
+  color:var(--ink-soft)}
+
+/* Shown in place of the canvas when a chart has no non-zero values. It keeps
+   the card's reserved height so a grid of charts does not reflow into a ragged
+   mess the moment one of them has data and its neighbour does not. */
+.chart-empty{display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:10px;text-align:center;padding:16px;
+  color:var(--ink-soft)}
+.chart-empty svg{width:34px;height:34px;opacity:.35}
+.chart-empty p{margin:0;font-size:12.5px;line-height:1.6;max-width:32ch}
+
+/* The bar is aria-hidden decoration — the number always sits beside it, so the
+   value never depends on reading a length or a colour. */
+.meter{display:inline-block;width:52px;height:6px;border-radius:3px;
+  background:var(--line-2);overflow:hidden;vertical-align:middle;
+  margin-right:7px}
+.meter i{display:block;height:100%;border-radius:3px;background:var(--primary)}
+.meter i.good{background:var(--ok)}
+.meter i.low{background:var(--accent)}
+.meter i.over{background:var(--danger)}
+
+.cell-sub{color:var(--ink-soft);font-size:11.5px}
+.num-over{color:var(--danger);font-weight:600}
+.card-link{font-size:12px;font-weight:600;color:var(--primary)}
+.stat.tone-warn .bar{background:var(--accent)}
+.stat.tone-ok .bar{background:var(--ok)}
+
+@media(max-width:900px){
+  .fb-field select,.fb-field input{max-width:none;width:100%}
+  .fb-field{flex:1 1 140px}
+  .chart-grid{grid-template-columns:minmax(0,1fr)}
+}
+
+/* ---------- resource planner ---------- */
+.visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+  overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+/* Status pills. Every one carries a text label as well as a colour — the
+   traffic-light scheme is reinforcement, never the only signal. */
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;
+  padding:3px 9px;border-radius:999px;white-space:nowrap}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.pill-available{background:var(--ok-soft);color:var(--ok)}
+.pill-near{background:var(--warn-soft);color:var(--warn)}
+.pill-over{background:var(--danger-soft);color:var(--danger)}
+.pill-off{background:#eff0f0;color:var(--ink-soft)}
+
+.meter i.u-available{background:var(--ok)}
+.meter i.u-near{background:var(--accent)}
+.meter i.u-over{background:var(--danger)}
+.meter i.u-off{background:var(--ink-faint)}
+
+.stat.tone-danger .bar{background:var(--danger)}
+
+.period-step{display:flex;align-items:center;gap:6px}
+.period-label{font-size:13px;min-width:150px;text-align:center}
+
+/* --- availability board --- */
+.board-grid{display:grid;gap:14px;margin-bottom:18px;
+  grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.board-col{margin:0}
+.board-ok .card-h{border-bottom-color:var(--ok-soft)}
+.board-danger .card-h{border-bottom-color:var(--danger-soft)}
+.board-person{display:flex;justify-content:space-between;align-items:flex-start;
+  gap:10px;padding:9px 0;border-bottom:1px solid var(--line-2)}
+.board-person:last-child{border-bottom:none}
+.bp-right{text-align:right;flex:none}
+.bp-hours{font-weight:700;font-size:13px;font-family:var(--mono)}
+
+.alert-card{border-color:rgba(194,47,47,.35);margin-bottom:18px}
+.over-list{list-style:none;margin:0;padding:0}
+.over-list li{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:9px 0;border-bottom:1px solid var(--line-2)}
+.over-list li:last-child{border-bottom:none}
+
+/* --- forecast --- */
+.forecast{display:flex;gap:10px;align-items:flex-end;overflow-x:auto;
+  padding-bottom:4px}
+.forecast-week{flex:1;min-width:64px;text-align:center}
+.forecast-week.now .fw-label{color:var(--primary);font-weight:700}
+.fw-label{font-size:11px;color:var(--ink-soft);margin-bottom:6px}
+/* Fixed height so the row of bars doesn't reflow as data loads. */
+.fw-bar{height:96px;background:var(--line-2);border-radius:6px;position:relative;
+  display:flex;align-items:flex-end;overflow:hidden}
+.fw-bar i{display:block;width:100%;border-radius:6px 6px 0 0}
+.fw-value{font-size:12px;font-weight:700;margin-top:6px;font-family:var(--mono)}
+.fw-sub{font-size:10.5px;color:var(--ink-faint)}
+
+.dept-bar{height:10px;border-radius:5px;background:var(--line-2);overflow:hidden}
+.dept-bar i{display:block;height:100%;border-radius:5px}
+.dept-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;
+  color:var(--ink-soft);margin:8px 0 16px}
+
+/* --- planner grid + heatmap --- */
+.planner-scroll{overflow-x:auto}
+.planner{width:100%;border-collapse:separate;border-spacing:0;font-size:12.5px}
+.planner th,.planner td{border-bottom:1px solid var(--line-2);padding:0}
+.planner .pl-name{text-align:left;padding:9px 14px;min-width:170px;
+  position:sticky;left:0;background:var(--card);z-index:2;
+  border-right:1px solid var(--line)}
+.planner thead .pl-name{z-index:3}
+.planner .pl-name strong{display:block;font-size:12.5px}
+.pl-day{padding:8px 4px;text-align:center;font-weight:700;color:var(--ink-soft);
+  font-size:10px;text-transform:uppercase;letter-spacing:.06em;min-width:74px}
+.pl-day.today{color:var(--primary);background:var(--primary-soft)}
+.pl-dow{display:block}
+.pl-dom{display:block;font-size:13px;color:var(--ink);letter-spacing:0}
+.pl-total{padding:8px 14px;text-align:right;min-width:110px;white-space:nowrap}
+
+.pl-cell{padding:6px 5px;text-align:center;vertical-align:top;min-width:74px;
+  border-left:1px solid var(--line-2);transition:box-shadow var(--speed)}
+.pl-cell.today{box-shadow:inset 0 0 0 1px var(--primary-ring)}
+.pl-hours{font-family:var(--mono);font-weight:700;font-size:12px}
+.pl-cap{font-size:10px;color:var(--ink-soft)}
+.pl-pct{display:block;font-size:10px;font-weight:700}
+.pl-off,.pl-leave{color:var(--ink-faint);font-size:13px}
+.pl-leave{color:var(--info);font-weight:700}
+.pl-pending{color:var(--warn);font-weight:700;margin-left:2px}
+.non-working{background:repeating-linear-gradient(45deg,transparent,transparent 5px,
+  rgba(11,15,13,.035) 5px,rgba(11,15,13,.035) 10px)}
+.pl-foot{background:#fbfdfc;font-weight:600}
+
+/* Heat scale. Five steps rather than a gradient: at a glance a continuous ramp
+   is unreadable, and the hours are printed in every cell regardless. */
+.heat-0{background:transparent}
+.heat-1{background:rgba(18,138,72,.10)}
+.heat-2{background:rgba(18,138,72,.22)}
+.heat-3{background:rgba(234,178,74,.34)}
+.heat-4{background:rgba(194,47,47,.26)}
+.heat-legend{display:flex;align-items:center;gap:4px;font-size:10px;
+  color:var(--ink-faint)}
+.heat-legend .heat{width:16px;height:10px;border-radius:2px;
+  border:1px solid var(--line)}
+
+/* --- task chips + drag and drop --- */
+.pl-tasks{display:flex;flex-direction:column;gap:3px;margin-top:5px}
+.chip{display:block;font-size:10.5px;font-weight:600;padding:3px 6px;
+  border-radius:5px;background:#fff;border:1px solid var(--line);
+  color:var(--ink);text-align:left;line-height:1.3;
+  border-left:3px solid var(--ink-faint);cursor:grab}
+.chip:hover{border-color:var(--primary);color:var(--primary)}
+.chip.prio-high{border-left-color:var(--danger)}
+.chip.prio-med{border-left-color:var(--accent)}
+.chip.prio-low{border-left-color:var(--ok)}
+.chip-meta{display:block;font-size:9.5px;color:var(--ink-faint);font-weight:500}
+.chip.dragging{opacity:.45;cursor:grabbing}
+.backlog{display:flex;flex-wrap:wrap;gap:6px;min-height:44px;padding:8px;
+  border:1px dashed var(--line);border-radius:9px}
+.backlog .chip{width:auto;max-width:220px}
+[data-drop].drop-target{box-shadow:inset 0 0 0 2px var(--primary);
+  background:var(--primary-soft)}
+[data-drop].saving{opacity:.55}
+
+.drop-toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);
+  background:var(--chrome);color:#fff;padding:11px 18px;border-radius:10px;
+  font-size:12.5px;font-weight:600;box-shadow:0 12px 34px rgba(0,0,0,.3);
+  z-index:60;max-width:min(520px,92vw)}
+.drop-toast.warn{background:var(--warn)}
+.drop-toast.bad{background:var(--danger)}
+
+.day-picker{display:flex;gap:6px;flex-wrap:wrap}
+.day-opt{display:flex;align-items:center;gap:5px;padding:7px 11px;
+  border:1px solid var(--line);border-radius:8px;font-size:12.5px;
+  font-weight:600;cursor:pointer;background:#fff}
+.day-opt:has(input:checked){border-color:var(--primary);
+  background:var(--primary-soft);color:var(--primary-strong)}
+.day-opt input{width:15px;height:15px}
+
+@media(max-width:900px){
+  .board-grid{grid-template-columns:minmax(0,1fr)}
+  .planner .pl-name{min-width:130px}
+  .period-label{min-width:auto}
+}
+
+/* ---------- topbar bell ---------- */
+.bell{position:relative;display:inline-flex;align-items:center;justify-content:center;
+  width:36px;height:36px;border-radius:9px;color:var(--ink-soft);
+  transition:background var(--speed),color var(--speed)}
+.bell:hover{background:var(--primary-soft);color:var(--primary-strong)}
+.bell svg{width:18px;height:18px}
+.bell .badge{position:absolute;top:2px;right:1px;min-width:16px;height:16px;
+  padding:0 4px;border-radius:9px;background:var(--danger);color:#fff;
+  font-size:10px;font-weight:700;line-height:16px;text-align:center}
+
+/* ---------- archived banner ---------- */
+.banner{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:12px 16px;border-radius:10px;margin-bottom:18px;font-size:13px;font-weight:500;
+  background:var(--warn-soft);color:var(--warn);border:1px solid #f2dfba}
+
+/* ---------- version diff (difflib.HtmlDiff output) ---------- */
+.diff-wrap{overflow-x:auto;padding:6px}
+table.diff{font-family:var(--mono);font-size:12px;border-collapse:collapse;width:100%}
+table.diff td,table.diff th{padding:3px 8px;border:none;font-size:12px}
+table.diff .diff_header{background:var(--line-2);color:var(--ink-soft);
+  text-align:right;font-size:11px;padding:3px 8px;user-select:none}
+table.diff td[nowrap]{white-space:pre-wrap!important;word-break:break-word}
+table.diff .diff_add{background:var(--ok-soft)}
+table.diff .diff_chg{background:var(--warn-soft)}
+table.diff .diff_sub{background:var(--danger-soft)}
+table.diff .diff_next{display:none}
+table.diff thead th{font-family:var(--sans);font-size:11px;text-transform:none;
+  letter-spacing:0;color:var(--ink);font-weight:700;background:var(--line-2)}
+table.diff tbody tr:hover td{background:inherit}
+
+/* ---------- pagination ---------- */
+.pager{display:flex;align-items:center;gap:10px;justify-content:center;
+  padding:14px;font-size:12.5px;color:var(--ink-soft)}
+.pager a{font-weight:600;color:var(--primary)}
+.pager a:hover{color:var(--primary-strong)}
+
+/* ---------- design asset manager ---------- */
+.asset-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px}
+.asset-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  overflow:hidden;box-shadow:var(--shadow-1);display:flex;flex-direction:column;
+  transition:box-shadow var(--speed),transform var(--speed),border-color var(--speed)}
+.asset-card:hover{box-shadow:var(--shadow-2);transform:translateY(-2px)}
+.asset-thumb{position:relative;display:block;aspect-ratio:4/3;background:
+  repeating-conic-gradient(#f2f4f3 0% 25%,#fafcfb 0% 50%) 50%/18px 18px;overflow:hidden}
+.asset-card.cover .asset-thumb{aspect-ratio:3/4}
+.asset-thumb img{width:100%;height:100%;object-fit:contain;display:block}
+.asset-thumb .ph{position:absolute;inset:0;display:flex;flex-direction:column;gap:8px;
+  align-items:center;justify-content:center;color:var(--ink-faint);font-size:11.5px;
+  font-weight:600;border:2px dashed var(--line);border-radius:0;margin:10px;
+  border-radius:10px;text-align:center;padding:8px}
+.asset-thumb .ph svg{width:26px;height:26px;opacity:.6}
+.asset-thumb .ftag{position:absolute;top:8px;left:8px;background:rgba(10,12,11,.72);
+  color:#fff;font-size:9.5px;font-weight:700;letter-spacing:.08em;padding:2px 7px;
+  border-radius:5px;text-transform:uppercase}
+.asset-thumb .vtag{position:absolute;top:8px;right:8px;background:var(--primary);
+  color:#fff;font-size:9.5px;font-weight:700;padding:2px 7px;border-radius:5px;
+  font-family:var(--mono)}
+.asset-body{padding:11px 13px 12px;display:flex;flex-direction:column;gap:3px;flex:1}
+.asset-body .nm{font-weight:600;font-size:13px;line-height:1.35}
+.asset-body .mt{font-size:11px;color:var(--ink-soft)}
+.asset-card.dragover{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-ring)}
+.asset-card.uploading{opacity:.6;pointer-events:none}
+.asset-card .spin{display:none;position:absolute;inset:0;z-index:2;
+  align-items:center;justify-content:center;background:rgba(255,255,255,.65)}
+.asset-card.uploading .spin{display:flex}
+.spinner{width:26px;height:26px;border:3px solid var(--primary-soft);
+  border-top-color:var(--primary);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* list view */
+.asset-list .asset-grid{display:flex;flex-direction:column;gap:8px}
+.asset-list .asset-card{flex-direction:row;align-items:center}
+.asset-list .asset-card:hover{transform:none}
+.asset-list .asset-thumb{width:84px;min-width:84px;aspect-ratio:4/3!important;
+  border-right:1px solid var(--line-2)}
+.asset-list .asset-thumb .ph{margin:4px;gap:2px;font-size:0}
+.asset-list .asset-thumb .ph svg{width:18px;height:18px}
+.asset-list .asset-thumb .ftag,.asset-list .asset-thumb .vtag{display:none}
+.asset-list .asset-body{flex-direction:row;align-items:center;gap:14px;padding:10px 16px}
+.asset-list .asset-body .nm{min-width:220px}
+
+/* toolbar */
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.seg button{background:#fff;border:none;padding:7px 10px;color:var(--ink-soft);
+  display:inline-flex;align-items:center;transition:background var(--speed),color var(--speed)}
+.seg button.on{background:var(--primary-soft);color:var(--primary-strong)}
+.seg button svg{width:15px;height:15px}
+.seg button + button{border-left:1px solid var(--line)}
+
+/* detail page */
+.asset-preview{display:flex;align-items:center;justify-content:center;min-height:380px;
+  background:repeating-conic-gradient(#f2f4f3 0% 25%,#fafcfb 0% 50%) 50%/22px 22px;
+  border-radius:10px;overflow:hidden;cursor:zoom-in}
+.asset-preview img{max-width:100%;max-height:560px;object-fit:contain;display:block}
+.asset-preview .ph{color:var(--ink-faint);font-weight:600;font-size:13px;text-align:center}
+.sticky-actions{position:sticky;top:74px}
+.lightbox{position:fixed;inset:0;z-index:100;background:rgba(6,8,7,.9);
+  display:none;align-items:center;justify-content:center;cursor:zoom-out;padding:28px}
+.lightbox.open{display:flex}
+.lightbox img{max-width:96vw;max-height:92vh;object-fit:contain;
+  box-shadow:0 30px 90px rgba(0,0,0,.6);border-radius:6px}
+.finfo{table-layout:fixed}
+.finfo td{padding:7px 0;border:none;font-size:12.5px;overflow-wrap:anywhere}
+.finfo td:first-child{color:var(--ink-soft);width:112px;white-space:nowrap}
+.finfo tr:hover td{background:none}
+/* Long emails and multi-line addresses were breaking out of the value column;
+   they wrap under their label on narrow screens instead. */
+@media(max-width:520px){
+  .finfo,.finfo tbody,.finfo tr,.finfo td{display:block;width:auto}
+  .finfo tr{padding:7px 0;border-bottom:1px solid var(--line-2)}
+  .finfo tr:last-child{border-bottom:none}
+  .finfo td{padding:0;text-align:left!important}
+  .finfo td:first-child{width:auto;font-size:11px;text-transform:uppercase;
+    letter-spacing:.06em;font-weight:700;margin-bottom:2px}
+}
+.dz-hint{border:2px dashed var(--line);border-radius:10px;padding:14px;text-align:center;
+  font-size:12px;color:var(--ink-soft);transition:border-color var(--speed),background var(--speed)}
+.dz-hint.dragover{border-color:var(--primary);background:var(--primary-soft)}
+
+/* ---------- accordion (client-first browsing) ---------- */
+.acc{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow-1);margin-bottom:12px;overflow:hidden}
+.acc-h{display:flex;align-items:center;gap:10px;width:100%;padding:14px 18px;
+  background:none;border:none;cursor:pointer;text-align:left;font:inherit;color:var(--ink);
+  min-height:48px;transition:background var(--speed)}
+.acc-h:hover{background:#f8f9f8}
+.acc-h:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
+.acc-chev{width:15px;height:15px;flex:none;color:var(--ink-soft);
+  transition:transform .2s ease}
+.acc.open .acc-chev{transform:rotate(90deg)}
+.acc-name{font-size:13.5px;font-weight:700;letter-spacing:-.01em;flex:1;min-width:0}
+.acc-meta{display:flex;align-items:center;gap:8px;flex:none}
+/* The collapse clips from .acc-b (the animating grid), NOT from .acc-inner.
+   Clipping on .acc-inner also swallowed the "+ New document for …" dropdown in
+   the footer — it is absolutely positioned below the last row, so it was
+   rendered entirely outside the clip box and never appeared. */
+.acc-b{display:grid;grid-template-rows:0fr;overflow:hidden;
+  transition:grid-template-rows .2s ease}
+.acc.open .acc-b{grid-template-rows:1fr;overflow:visible}
+.acc.open{overflow:visible}
+.acc-inner{min-width:0;border-top:0 solid var(--line-2)}
+.acc.open .acc-inner{border-top-width:1px}
+.acc-foot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;
+  padding:10px 18px;border-top:1px solid var(--line-2);font-size:12.5px}
+.acc-foot a{color:var(--primary);font-weight:600}
+/* Footer menus open upward: there is nothing below them but the page edge. */
+.acc-foot details.menu .pop{top:auto;bottom:calc(100% + 8px);right:auto;left:0}
+
+/* ---------- finances ---------- */
+.fin-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;
+  border-bottom:1px solid var(--line-2)}
+.fin-item{padding:14px 20px}
+.fin-item+.fin-item{border-left:1px solid var(--line-2)}
+.fin-l{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--ink-soft);font-weight:700;margin-bottom:5px}
+.fin-n{font-size:18px;font-weight:800;letter-spacing:-.02em;font-family:var(--mono)}
+.fin-due{color:var(--warn)}
+.link-danger{background:none;border:none;padding:0;margin-left:10px;cursor:pointer;
+  font:inherit;font-size:12px;font-weight:600;color:var(--danger)}
+.link-danger:hover{text-decoration:underline}
+@media(max-width:900px){.fin-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .fin-item:nth-child(odd){border-left:none}}
+
+/* ---------- onboarding checklist ---------- */
+.progress{height:5px;background:var(--line-2);overflow:hidden}
+.progress-fill{height:100%;background:var(--brand-grad);border-radius:0 3px 3px 0;
+  transition:width .25s ease}
+.ob-list{padding:6px 0}
+.ob-row{display:flex;align-items:center;gap:12px;padding:9px 20px;min-height:44px}
+.ob-row+.ob-row{border-top:1px solid var(--line-2)}
+.ob-check{width:22px;height:22px;flex:none;border:1.5px solid var(--line);
+  border-radius:6px;background:#fff;display:inline-flex;align-items:center;
+  justify-content:center;padding:0;color:#fff;cursor:pointer;
+  transition:background var(--speed),border-color var(--speed)}
+.ob-check svg{width:13px;height:13px}
+.ob-check.on{background:var(--primary);border-color:var(--primary)}
+.ob-check.auto{cursor:default;border-style:dashed}
+.ob-check.auto.on{border-style:solid;opacity:.85}
+button.ob-check:hover:not(.auto){border-color:var(--primary)}
+button.ob-check:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.ob-label{font-size:13.5px;font-weight:600;flex:1;min-width:0}
+.ob-row.done .ob-label{color:var(--ink-soft)}
+.ob-hint{font-size:11px;font-weight:600;color:var(--ink-faint);
+  text-transform:uppercase;letter-spacing:.06em;margin-left:8px}
+.ob-when{font-size:12px;color:var(--ink-soft);white-space:nowrap}
+
+/* ---------- delivery workspace ---------- */
+.ov-meta{display:flex;flex-wrap:wrap;gap:24px}
+.ov-item .ov-v{font-size:13.5px;font-weight:700;margin-top:2px}
+.ov-links{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.inline-form{display:flex;flex-wrap:wrap;gap:8px;align-items:center;
+  padding:12px 20px;border-bottom:1px solid var(--line-2);background:#fafcfb}
+.inline-form input,.inline-form select{padding:8px 11px;border:1px solid var(--line);
+  border-radius:8px;font:inherit;font-size:12.5px;background:#fff}
+.inline-form input:focus,.inline-form select:focus{outline:none;
+  border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-ring)}
+.inline-form input[type=file]{padding:6px}
+
+/* Labelled add-rows. A bare row of controls is unreadable to anyone who hasn't
+   used the page before: two of the selects on the task row both show a person's
+   name, and nothing says which one is the assignee and which the reviewer.
+   Opt-in via .labelled, because the one- and two-field forms elsewhere read
+   fine without it. Same treatment as .fb-field on the analytics filter card. */
+.inline-form.labelled{align-items:flex-end;row-gap:11px}
+.if-field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.if-l{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;
+  color:var(--ink-faint);white-space:nowrap;line-height:1.4}
+.if-field>input,.if-field>select{width:100%}
+.if-field.grow{flex:2 1 180px}
+.if-field.mid{flex:1 1 140px}
+/* The checkbox and the submit button carry their own words, so they get no
+   label — nudge them onto the optical centre of the control line instead of
+   letting flex-end sit them flush against its bottom edge. */
+.inline-form.labelled .check-inline{padding-bottom:8px}
+.inline-form.labelled>.btn{margin-bottom:3px}
+/* .file-pick is already a column, so it only needs the same rhythm as .if-field
+   — and its hint keeps its own spacing instead of doubling up with the gap. */
+.inline-form.labelled .file-pick{justify-content:flex-end;gap:4px}
+.inline-form.labelled .file-pick .upload-hint{margin-top:0}
+
+/* Project team. Roster rows rather than pills: the second line is a full
+   designation ("Co-Founder · Tech"), and a pill wide enough to hold that stops
+   reading as a token. Same avatar → name → meta rhythm as the employee
+   directory, so the app's two lists of people look like the same kind of thing.
+   The grid keeps rows to a readable width instead of one column of long bars. */
+.member-list{list-style:none;margin:0;padding:0;display:grid;gap:8px;
+  grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
+.member-row{display:flex;align-items:center;gap:11px;min-width:0;
+  padding:9px 8px 9px 11px;background:#fff;
+  border:1px solid var(--line);border-radius:var(--radius-sm)}
+.emp-avatar.sm{width:32px;height:32px;font-size:13px}
+/* min-width:0 on both the flex child and the text, or the ellipsis never fires
+   and a long name pushes the remove button off the row instead. */
+.member-body{flex:1;min-width:0;display:flex;flex-direction:column}
+.member-name,.member-role{min-width:0;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.member-name{font-size:13px;font-weight:600;color:var(--ink);line-height:1.35}
+.member-role{font-size:11.5px;color:var(--ink-soft);line-height:1.35}
+/* align-self:stretch plus the negative block margins is what actually grows the
+   target: a fixed height would leave a 34px box floating in a 52px row, whereas
+   stretching resolves the height to the row's full outer height, padding
+   included. So a 15px glyph carries a ~40x52 pointer area — past the 44px touch
+   guidance on the axis that matters — without a button that looks heavier than
+   the name beside it. Destructive colour is held back until hover/focus:
+   nothing on a roster should read as armed. */
+.member-x{flex:none;align-self:stretch;
+  display:flex;align-items:center;justify-content:center;
+  width:40px;margin:-9px -8px -9px 0;padding:0;
+  border:none;background:transparent;border-radius:var(--radius-sm);
+  color:var(--ink-faint);cursor:pointer;
+  transition:color var(--speed),background var(--speed)}
+.member-x svg{width:15px;height:15px}
+.member-x:hover{color:var(--danger);background:var(--danger-soft)}
+.member-x:focus-visible{outline:2px solid var(--primary);outline-offset:1px}
+.kanban{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0}
+.kan-col{padding:14px;min-height:120px}
+.kan-col+.kan-col{border-left:1px solid var(--line-2)}
+.kan-h{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;
+  color:var(--ink-soft);margin-bottom:10px;display:flex;align-items:center;gap:7px}
+.kan-empty{color:var(--ink-faint);font-size:12px;padding:6px 2px}
+.task{border:1px solid var(--line);border-radius:10px;padding:10px 12px;
+  margin-bottom:8px;background:#fff;box-shadow:var(--shadow-1)}
+.task.done .task-title{text-decoration:line-through;color:var(--ink-soft)}
+.task-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.task-title{font-size:13px}
+.task-desc{color:var(--ink-soft);font-size:12px;margin-top:4px}
+.task-meta{display:flex;flex-wrap:wrap;gap:10px;color:var(--ink-faint);
+  font-size:11.5px;margin-top:6px}
+.task-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;align-items:center}
+/* The row-level actions — Edit, Delete, Approve — across task cards, worklog
+   tables, the leave list and the RBAC lists. At 12px with no padding the tap
+   target was the height of the text itself, about 16px, which is under the
+   24px WCAG 2.2 AA floor and a genuine miss on a phone where these sit 10px
+   apart in a flex row.
+   The padding buys the height; the equal negative margin gives it straight back
+   to the layout, so every row keeps the spacing it has today and only the hit
+   area grows. */
+.link-act{background:none;border:none;padding:6px 0;margin:-6px 0;
+  cursor:pointer;font:inherit;
+  font-size:12px;font-weight:600;color:var(--primary)}
+.link-act:hover{text-decoration:underline}
+/* Project assets. Every rule here is scoped under .asset — these class names
+   (asset-grid / asset-thumb / asset-body) are ALSO used by the template
+   designer's .asset-card above, and the unscoped copies that used to live here
+   overrode it: a template cover lost its 3/4 aspect ratio to a flat 110px and
+   its caption layout to this one. */
+.asset{border:1px solid var(--line);border-radius:10px;padding:10px;background:#fff;
+  display:flex;flex-direction:column;gap:6px}
+.asset .asset-thumb{display:block;height:110px;border-radius:7px;overflow:hidden;
+  background:#f3f4f3;aspect-ratio:auto}
+.asset .asset-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.asset .asset-thumb.file{display:flex;align-items:center;justify-content:center;
+  color:var(--ink-faint)}
+.asset .asset-thumb.file svg{width:34px;height:34px}
+.asset .asset-body{font-size:12.5px;display:flex;flex-direction:column;gap:3px;
+  align-items:flex-start;padding:0}
+.cred-box{margin-top:18px;border:1px dashed var(--warn);border-radius:10px;
+  padding:14px;background:var(--warn-soft)}
+.timeline{padding:6px 20px 14px}
+.tl-row{display:flex;align-items:center;gap:12px;padding:10px 0;
+  border-bottom:1px solid var(--line-2);flex-wrap:wrap}
+.tl-row:last-child{border-bottom:none}
+.tl-dot{width:11px;height:11px;border-radius:50%;flex:none;
+  border:2px solid var(--line);background:#fff}
+.tl-dot.on{background:var(--primary);border-color:var(--primary)}
+.tl-dot.half{border-color:var(--primary)}
+.tl-body{flex:1;min-width:180px;font-size:13px}
+.tl-row.done .tl-body strong{color:var(--ink-soft);text-decoration:line-through}
+.tl-due{color:var(--ink-faint);font-size:12px;margin-left:8px}
+.tl-actions{display:flex;gap:10px;align-items:center}
+.summary-strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:18px}
+.sum-card{padding:14px 18px}
+.sum-line{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-top:6px;
+  font-size:12.5px;color:var(--ink-soft)}
+.sum-line strong{color:var(--ink);font-family:var(--mono)}
+@media(max-width:900px){
+  .kanban{grid-template-columns:minmax(0,1fr)}
+  .kan-col+.kan-col{border-left:none;border-top:1px solid var(--line-2)}
+  .summary-strip{grid-template-columns:minmax(0,1fr)}
+}
+
+/* ---------- monthly report form ---------- */
+.report-assets{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.report-asset{border:1.5px solid var(--line);border-radius:10px;padding:8px;cursor:pointer;
+  display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;
+  transition:border-color var(--speed),box-shadow var(--speed)}
+.report-asset:has(input:checked){border-color:var(--primary);
+  box-shadow:0 0 0 3px var(--primary-ring)}
+.report-asset img{width:100%;height:84px;object-fit:cover;border-radius:6px;
+  background:#f3f4f3}
+.report-asset input{width:15px;height:15px}
+
+/* ---------- responsive / motion ---------- */
+@media(max-width:900px){
+  .layout{grid-template-columns:minmax(0,1fr)}
+  /* The sidebar becomes an off-canvas drawer. It used to be display:none,
+     which left the app with no navigation at all on a phone — no way to reach
+     any section, and no way to sign out. */
+  .side{position:fixed;top:0;left:0;width:270px;max-width:84vw;
+    transform:translateX(-100%);transition:transform .22s ease;
+    box-shadow:0 0 40px rgba(0,0,0,.4)}
+  body.nav-open .side{transform:none}
+  body.nav-open .scrim{display:block}
+  body.nav-open{overflow:hidden}
+  .nav-toggle{display:inline-flex}
+  .side .side-close{display:inline-flex;align-items:center;justify-content:center;
+    position:absolute;top:16px;right:12px;width:34px;height:34px;border:none;
+    background:rgba(255,255,255,.07);color:#d3d8d6;border-radius:9px;cursor:pointer}
+  .side .side-close:hover{background:rgba(255,255,255,.14);color:#fff}
+  .side .side-close svg{width:16px;height:16px}
+  .brand img{width:140px}
+  .topbar{padding:0 16px;gap:10px}
+  .topbar .m-logo{display:none}
+  .stat-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  .grid-2{grid-template-columns:minmax(0,1fr)}
+  .row{grid-template-columns:minmax(0,1fr)}
+  .content{padding:20px 16px}
+  /* Header actions stack under the title instead of squeezing it to nothing. */
+  .page-head{flex-direction:column;align-items:stretch;gap:14px}
+  .page-head h2{font-size:19px}
+}
+@media(max-width:520px){
+  .stat-grid{grid-template-columns:minmax(0,1fr)}
+  .topbar-actions .btn span.lbl{display:none}
+  .topbar-actions .btn{padding:9px 11px}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
+  html{scroll-behavior:auto}
+}
+
+/* ============================================================
+   Task management — board cards, task detail, My Tasks
+   ============================================================ */
+
+/* ---------- board ---------- */
+.kanban.four{grid-template-columns:repeat(4,minmax(0,1fr))}
+.task-title{font-size:13px;font-weight:700;color:var(--ink);text-decoration:none;
+  display:block;line-height:1.35}
+a.task-title:hover{color:var(--primary);text-decoration:underline}
+.task.done a.task-title{text-decoration:line-through;color:var(--ink-soft)}
+.task.overdue{border-left:3px solid var(--danger)}
+.task-proj{font-size:11px;color:var(--ink-faint);font-weight:600;margin-top:4px}
+.task-meta .tm{display:inline-flex;align-items:center;gap:4px}
+.task-meta .tm svg{width:12px;height:12px}
+.task-meta .tm.muted{color:var(--ink-faint);font-style:italic}
+.task-meta .tm.is-overdue{color:var(--danger);font-weight:700}
+.task-flags{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+.task-flags:empty{display:none}
+.task-flags .tag svg{width:10px;height:10px}
+.link-act.muted{color:var(--ink-soft);font-weight:600}
+.link-act.strong{color:var(--ok)}
+.danger-text{color:var(--danger)}
+
+/* ---------- task detail: status strip ---------- */
+.tk-strip{display:flex;flex-wrap:wrap;gap:18px;align-items:center;
+  justify-content:space-between;padding:16px 20px}
+.tk-state{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tk-state .fin-l{margin-right:2px}
+.tk-acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.tk-blocked{display:flex;gap:10px;align-items:flex-start;flex:1;min-width:240px;
+  background:var(--danger-soft);color:var(--danger);border-radius:10px;
+  padding:10px 13px;font-size:12.5px}
+.tk-blocked svg{width:16px;height:16px;flex:none;margin-top:1px}
+.tk-blocked-list{margin-top:3px;color:var(--ink-soft);font-weight:600}
+.tk-blocked-list a{color:var(--danger)}
+.tk-review{border-top:1px solid var(--line-2);background:var(--info-soft);
+  padding:14px 20px;border-radius:0 0 var(--radius) var(--radius)}
+.tk-review.muted-note{background:#fafcfb;color:var(--ink-soft);font-size:12.5px}
+.tk-review-h{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;
+  margin-bottom:10px;font-size:13px}
+.tk-review-h span{color:var(--ink-soft);font-size:12.5px}
+.tk-review-forms{display:flex;flex-wrap:wrap;gap:16px}
+.tk-review-forms form{display:flex;gap:8px;align-items:center;flex:1;min-width:260px}
+.tk-review-forms input{flex:1;min-width:120px;padding:8px 11px;
+  border:1px solid var(--line);border-radius:8px;font:inherit;font-size:12.5px;
+  background:#fff}
+.tk-review-forms input:focus{outline:none;border-color:var(--primary);
+  box-shadow:0 0 0 3px var(--primary-ring)}
+.tk-desc{color:var(--ink-soft);font-size:13px;margin-top:14px;
+  padding-top:14px;border-top:1px solid var(--line-2)}
+.ov-sub{color:var(--ink-faint);font-weight:500;font-size:12px}
+.inl-l{font-size:11px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.06em;color:var(--ink-soft)}
+
+/* ---------- checklist ---------- */
+.tk-bar{height:4px;background:var(--line-2);overflow:hidden}
+.tk-bar span{display:block;height:100%;background:var(--primary);
+  transition:width var(--speed,.18s)}
+.ck-row{display:flex;align-items:center;gap:10px;padding:7px 0;
+  border-bottom:1px solid var(--line-2)}
+.ck-row:last-child{border-bottom:none}
+.ck-box{width:20px;height:20px;flex:none;border-radius:6px;cursor:pointer;
+  border:2px solid var(--line);background:#fff;display:flex;
+  align-items:center;justify-content:center;padding:0;color:#fff}
+.ck-box svg{width:12px;height:12px}
+.ck-box.on{background:var(--primary);border-color:var(--primary)}
+button.ck-box:hover{border-color:var(--primary)}
+button.ck-box:focus-visible,.ck-mv:focus-visible{outline:2px solid var(--primary);
+  outline-offset:2px}
+.ck-text{flex:1;min-width:0;font-size:13px}
+.ck-row.done .ck-text{color:var(--ink-soft);text-decoration:line-through}
+.ck-acts{display:flex;gap:2px;align-items:center}
+.ck-mv{width:28px;height:28px;border:none;background:none;cursor:pointer;
+  border-radius:6px;color:var(--ink-faint);display:flex;
+  align-items:center;justify-content:center;padding:0}
+.ck-mv svg{width:14px;height:14px}
+.ck-mv:hover:not([disabled]){background:var(--line-2);color:var(--ink)}
+.ck-mv[disabled]{opacity:.3;cursor:not-allowed}
+
+/* ---------- dependencies ---------- */
+.dep-list{list-style:none;margin:8px 0 0;padding:0;display:flex;
+  flex-direction:column;gap:7px}
+.dep-list li{display:flex;align-items:center;gap:8px;font-size:12.5px}
+.dep-list a{flex:1;min-width:0}
+.dep-dot{width:8px;height:8px;border-radius:50%;flex:none;
+  border:2px solid var(--line);background:#fff}
+.dep-dot.on{background:var(--ok);border-color:var(--ok)}
+.dep-form{padding:14px 20px;border-top:1px solid var(--line-2);background:#fafcfb;
+  border-radius:0 0 var(--radius) var(--radius)}
+.dep-form select{width:100%;margin-top:6px;padding:8px 10px;font:inherit;
+  font-size:12.5px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.dep-form select:focus{outline:none;border-color:var(--primary);
+  box-shadow:0 0 0 3px var(--primary-ring)}
+.dep-form .hint{font-size:11.5px;color:var(--ink-soft);margin:6px 0 10px}
+
+/* ---------- comments ---------- */
+.cm-row{display:flex;gap:11px;padding:11px 0;border-bottom:1px solid var(--line-2)}
+.cm-row:last-child{border-bottom:none}
+.cm-avatar{width:30px;height:30px;flex:none;border-radius:50%;
+  background:var(--primary-soft);color:var(--primary-strong);font-weight:700;
+  font-size:12.5px;display:flex;align-items:center;justify-content:center}
+.cm-body{flex:1;min-width:0}
+.cm-head{display:flex;flex-wrap:wrap;gap:9px;align-items:baseline;font-size:12.5px}
+.cm-when{color:var(--ink-faint);font-size:11.5px}
+.cm-text{font-size:13px;margin-top:3px;color:var(--ink);overflow-wrap:anywhere}
+.cm-form{display:flex;gap:10px;align-items:flex-end;padding:14px 20px;
+  border-top:1px solid var(--line-2);background:#fafcfb;
+  border-radius:0 0 var(--radius) var(--radius)}
+.cm-form textarea{flex:1;padding:9px 12px;border:1px solid var(--line);
+  border-radius:8px;font:inherit;font-size:13px;resize:vertical;background:#fff}
+.cm-form textarea:focus{outline:none;border-color:var(--primary);
+  box-shadow:0 0 0 3px var(--primary-ring)}
+
+/* ---------- task form ---------- */
+.f-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 16px}
+.check-line{display:flex;align-items:center;gap:9px;font-size:13px;
+  font-weight:600;cursor:pointer;padding:4px 0}
+.check-line input{width:16px;height:16px;accent-color:var(--primary)}
+.hint{font-size:11.5px;color:var(--ink-soft);margin-top:5px}
+
+/* ---------- my tasks ---------- */
+.mt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+  gap:10px}
+.mt-grid .task{margin-bottom:0}
+.empty-state{text-align:center;padding:28px 20px;color:var(--ink-soft)}
+.empty-state svg{width:38px;height:38px;color:var(--ink-faint);margin-bottom:10px}
+.empty-state p{font-size:13px;margin-bottom:4px}
+.empty-state strong{color:var(--ink);font-size:14px}
+.empty-state .btn{margin-top:14px}
+
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+  overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+@media(max-width:1200px){
+  .kanban.four{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kanban.four .kan-col:nth-child(3){border-left:none}
+  .kanban.four .kan-col:nth-child(n+3){border-top:1px solid var(--line-2)}
+}
+@media(max-width:900px){
+  .kanban.four{grid-template-columns:minmax(0,1fr)}
+  .kanban.four .kan-col+.kan-col{border-left:none;border-top:1px solid var(--line-2)}
+  .f-grid{grid-template-columns:minmax(0,1fr)}
+  .tk-strip{flex-direction:column;align-items:stretch}
+  .tk-acts .btn{flex:1}
+}
+
+/* ============================================================
+   Work logs / timesheet
+   ============================================================ */
+
+/* ---------- totals + billable split ---------- */
+.ts-totals{display:flex;flex-wrap:wrap;gap:28px}
+.ts-big{font-size:20px;font-weight:800;letter-spacing:-.02em;margin-top:2px;
+  font-family:var(--mono,inherit)}
+.ts-big.ok{color:var(--ok)}
+.ts-big.muted{color:var(--ink-soft)}
+.split-bar{height:8px;border-radius:99px;background:var(--line-2);overflow:hidden;
+  margin-top:16px;display:flex}
+.split-bar .split-billable{background:var(--ok);height:100%;display:block}
+.split-key{display:flex;gap:18px;margin-top:8px;font-size:11.5px;
+  color:var(--ink-soft);font-weight:600}
+.split-key .dot{display:inline-block;width:8px;height:8px;border-radius:50%;
+  margin-right:5px}
+.split-key .dot.billable{background:var(--ok)}
+.split-key .dot.nonbillable{background:var(--line-2);
+  border:1px solid var(--ink-faint)}
+
+/* ---------- timesheet table ---------- */
+.ts-table{width:100%;border-collapse:collapse}
+.ts-table td,.ts-table th{padding:9px 20px;border-bottom:1px solid var(--line-2);
+  vertical-align:top;text-align:left}
+.ts-table tr:last-child td{border-bottom:none}
+.ts-day th{background:#fafcfb;font-size:11px;text-transform:uppercase;
+  letter-spacing:.07em;color:var(--ink-soft);font-weight:700;padding:7px 20px}
+.ts-day-total{float:right;font-family:var(--mono,inherit);color:var(--ink);
+  text-transform:none;letter-spacing:0}
+.ts-when{width:104px;white-space:nowrap;font-size:12.5px;color:var(--ink-soft)}
+.ts-what strong{font-size:13px;font-weight:600;display:block}
+.ts-sub{font-size:11.5px;color:var(--ink-faint);margin-top:3px}
+.ts-note{font-size:11.5px;color:var(--danger);margin-top:4px;font-weight:600}
+.ts-hours{width:74px;white-space:nowrap;font-weight:700;font-size:13px;
+  font-family:var(--mono,inherit)}
+.ts-billable{width:104px}
+.ts-status{width:150px;white-space:nowrap}
+.ts-acts,.ts-review{width:150px;text-align:right}
+.ts-acts{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;
+  align-items:center;border-bottom:none}
+.ts-rejected{background:#fdf7f7}
+.ts-shot{display:inline-flex;vertical-align:middle;margin-left:6px;
+  color:var(--ink-faint)}
+.ts-shot svg{width:15px;height:15px}
+.ts-shot:hover{color:var(--primary)}
+
+.ts-week-foot{display:flex;flex-wrap:wrap;gap:14px;align-items:center;
+  justify-content:space-between;padding:13px 20px;background:#fafcfb;
+  border-top:1px solid var(--line-2);
+  border-radius:0 0 var(--radius) var(--radius)}
+.ts-week-sum{font-size:12.5px;color:var(--ink-soft)}
+.ts-week-sum strong{color:var(--ink);font-family:var(--mono,inherit)}
+.ts-done{font-size:12.5px;color:var(--ok);font-weight:600}
+
+/* ---------- log-time form ---------- */
+.ts-form{padding:16px 20px}
+.ts-form-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0 16px}
+.ts-form-foot{display:flex;gap:16px;align-items:center;justify-content:flex-end;
+  flex-wrap:wrap;margin-top:4px}
+.check-inline{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;
+  font-weight:600;white-space:nowrap;cursor:pointer}
+.check-inline input{width:15px;height:15px;accent-color:var(--primary)}
+.reject-form{display:flex;gap:6px;margin-top:6px;align-items:center}
+.reject-form input{width:150px;padding:6px 9px;border:1px solid var(--line);
+  border-radius:7px;font:inherit;font-size:12px;background:#fff}
+.reject-form input:focus{outline:none;border-color:var(--primary);
+  box-shadow:0 0 0 3px var(--primary-ring)}
+.ts-review form{display:flex;justify-content:flex-end}
+
+/* ---------- filter bar ---------- */
+.filter-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;
+  padding:11px 20px;border-bottom:1px solid var(--line-2);background:#fbfdfc}
+.filter-bar select,.filter-bar input{padding:6px 10px;border:1px solid var(--line);
+  border-radius:7px;font:inherit;font-size:12px;background:#fff}
+.filter-bar select:focus,.filter-bar input:focus{outline:none;
+  border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-ring)}
+.filter-count{font-size:12px;color:var(--ink-soft);font-weight:600;
+  margin-left:auto}
+
+/* ---------- effort bar (task detail) ---------- */
+.effort{margin-top:16px;padding-top:14px;border-top:1px solid var(--line-2)}
+.effort-head{display:flex;justify-content:space-between;align-items:baseline;
+  gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.effort-num{font-size:12.5px;font-weight:700;font-family:var(--mono,inherit)}
+.effort-bar{height:7px;border-radius:99px;background:var(--line-2);overflow:hidden}
+.effort-bar span{display:block;height:100%;background:var(--primary);
+  border-radius:99px}
+.effort-bar span.over{background:var(--danger)}
+
+@media(max-width:900px){
+  .ts-form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ts-totals{gap:18px}
+  .ts-table td,.ts-table th{padding:8px 14px}
+  .ts-when,.ts-billable,.ts-status{width:auto}
+  .filter-count{margin-left:0}
+}
+
+/* ============================================================
+   Inline row editing (departments, designations)
+   Bare inputs in table cells otherwise render as raw browser
+   controls — these give them the same treatment as .field inputs.
+   ============================================================ */
+.row-edit td{padding:10px 20px;vertical-align:middle}
+.row-edit th.num,.row-edit td.num{width:110px}
+.row-edit input,.row-edit select{width:100%;max-width:230px;padding:7px 11px;
+  border:1px solid var(--line);border-radius:8px;font:inherit;font-size:13px;
+  background:#fff;color:var(--ink);
+  transition:border-color var(--speed),box-shadow var(--speed)}
+.row-edit input:hover,.row-edit select:hover{border-color:var(--ink-faint)}
+.row-edit input:focus,.row-edit select:focus{outline:none;
+  border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-ring)}
+.row-edit select{appearance:none;cursor:pointer;padding-right:30px;
+  background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235d6f6e' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 9px center;
+  background-size:14px}
+.row-edit input.w-narrow{max-width:76px;text-align:center}
+.row-edit td.row-actions{display:table-cell;white-space:nowrap;text-align:right}
+.row-edit td.row-actions button{margin-left:14px}
+/* The per-row form only carries the CSRF token; its controls join it via
+   form="…", so it must not take up layout space. */
+.row-edit td>form{display:contents}
+
+/* Chevron clearance — MUST stay after every rule that sets `padding` on these
+   selects. Each of those uses the shorthand, which resets the right-hand gap
+   from the shared chevron rule and left the arrow sitting on top of the label
+   ("All statuses" in the document filters was the visible case). */
+.field select,.filters select,.ts-form select{padding-right:30px}
+.inline-form select,.dep-form select{padding-right:28px}
+.filter-bar select{padding-right:26px;background-position:right 7px center}
+
+/* Sidebar sign-out is a POST button styled to match the links beside it. */
+.side-foot form{display:inline}
+.side-foot .linkish{background:none;border:none;padding:0;margin:0;cursor:pointer;
+  font:inherit;font-size:12.5px;color:#848a87;
+  transition:color var(--speed)}
+.side-foot .linkish:hover{color:var(--brand-green)}
+.side-foot .linkish:focus-visible{outline:2px solid var(--brand-green);
+  outline-offset:2px;border-radius:4px}
+
+@media(max-width:900px){
+  .row-edit input,.row-edit select{max-width:none}
+  .row-edit td{padding:9px 14px}
+}
+
+/* ============================================================
+   CALENDAR (calendar_hub)
+   Nine entry kinds, each with a colour AND a marker glyph AND its name in
+   text. Colour is the fastest signal, never the only one — the grid stays
+   readable in greyscale, on a printout, and for a colour-blind reader.
+   Tones are drawn from the status tokens above rather than a new palette, so
+   the calendar sits inside the console instead of on top of it.
+   ============================================================ */
+
+/* small shared bits the calendar templates lean on */
+.muted{color:var(--ink-soft)}
+.muted.sm{font-size:12px}
+.tight-list{list-style:none;display:flex;flex-direction:column;gap:9px}
+.tight-list li{display:flex;align-items:baseline;gap:8px;font-size:13px}
+.tight-list li a{color:var(--ink);font-weight:600;flex:1;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tight-list li a:hover{color:var(--primary)}
+.kv{width:100%}
+.kv td{padding:9px 0;border-bottom:1px solid var(--line-2);font-size:13px}
+.kv td:first-child{color:var(--ink-soft);width:40%}
+.inline-date{display:inline-flex;align-items:center;gap:6px;font-size:12px;
+  color:var(--ink-soft)}
+.inline-date input{padding:7px 9px;border:1px solid var(--line);border-radius:8px;
+  font:inherit;font-size:12.5px}
+.status-action{display:flex;align-items:center;gap:8px}
+
+/* --- kind tones: a background, a border colour, and a marker colour that
+   clears 4.5:1 on that background. --- */
+.tone-task     {--tone:#20657f; --tone-bg:#edf0ee}
+.tone-milestone{--tone:#00795b; --tone-bg:#e2f8ee}
+.tone-project  {--tone:#c22f2f; --tone-bg:#fbe9e9}
+.tone-meeting  {--tone:#a36908; --tone-bg:#fdf1dd}
+.tone-event    {--tone:#5a4b8a; --tone-bg:#efecf7}
+.tone-document {--tone:#7a5320; --tone-bg:#f8efe2}
+.tone-leave    {--tone:#00614a; --tone-bg:#dff5ea}
+.tone-holiday  {--tone:#128a48; --tone-bg:#e3f5eb}
+.tone-birthday {--tone:#a3346b; --tone-bg:#fbe9f2}
+.tone-client   {--tone:#3553b8; --tone-bg:#e9eefb}
+
+/* --- legend, which is also the category filter --- */
+.legend{display:flex;flex-wrap:wrap;gap:7px;padding:12px 16px;border:none;
+  border-top:1px solid var(--line-2);background:#fbfdfc}
+.legend-chip{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;
+  border:1px solid var(--line);border-radius:999px;background:#fff;
+  font-size:12px;font-weight:600;color:var(--ink-soft);cursor:pointer;
+  position:relative;min-height:34px;
+  transition:border-color var(--speed),background var(--speed)}
+.legend-chip input{position:absolute;opacity:0;width:1px;height:1px}
+.legend-chip .marker{color:var(--tone);font-size:13px;line-height:1}
+.legend-chip .num{font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+.legend-chip:hover{border-color:var(--tone)}
+.legend-chip.on{background:var(--tone-bg);border-color:var(--tone);color:var(--ink)}
+.legend-chip:focus-within{outline:2px solid var(--primary);outline-offset:2px}
+
+/* --- the month grid --- */
+.cal-wrap{overflow-x:auto;padding:0}
+.cal-month{width:100%;min-width:760px;border-collapse:collapse;table-layout:fixed}
+.cal-month th{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--ink-soft);padding:11px 10px;border-bottom:1px solid var(--line-2);
+  font-weight:700;text-align:left}
+.cal-month th abbr{text-decoration:none;border:none}
+.cal-cell{vertical-align:top;height:112px;padding:7px 8px;
+  border:1px solid var(--line-2);transition:background var(--speed)}
+.cal-cell.other{background:#fafcfb}
+.cal-cell.other .cal-daynum a{color:var(--ink-faint)}
+.cal-cell.weekend{background:#f9fafa}
+.cal-cell.today{background:var(--primary-soft);box-shadow:inset 0 0 0 2px var(--primary)}
+.cal-cell.drop-over{background:var(--accent-soft);
+  box-shadow:inset 0 0 0 2px var(--accent)}
+.cal-daynum{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.cal-daynum a{font-size:12.5px;font-weight:700;color:var(--ink);
+  min-width:22px;display:inline-block}
+.cal-daynum a:hover{color:var(--primary)}
+.cal-daynum .tag{font-size:9.5px;padding:1px 6px}
+.cal-chips{display:flex;flex-direction:column;gap:3px}
+.cal-more{display:inline-block;margin-top:4px;font-size:11px;font-weight:700;
+  color:var(--primary);cursor:pointer}
+.cal-more:hover{color:var(--primary-strong);text-decoration:underline}
+
+/* --- a chip ---
+   `.ev-chip`, not `.chip`: the resource planner claimed the bare `.chip` name
+   first (see the backlog section above), and because this block is further down
+   the file it was silently winning on the planner's task chips too — killing
+   their priority border, their white background, and dropping `.chip-meta`
+   onto the same line as the title. Two unrelated components cannot share one
+   global class name. This one joins its own module's `.ev-*` family, which is
+   what the rest of the calendar's event styling already uses. */
+.ev-chip{display:flex;align-items:center;gap:5px;padding:3px 7px;border-radius:6px;
+  background:var(--tone-bg);border-left:3px solid var(--tone);
+  font-size:11.5px;line-height:1.35;color:var(--ink);
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.ev-chip:hover{filter:brightness(.97)}
+.ev-chip .marker{color:var(--tone);flex:none;font-size:10px}
+.ev-chip .when{font-family:var(--mono);font-size:10.5px;color:var(--tone);flex:none}
+.ev-chip .what{overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.ev-chip.late{box-shadow:inset 0 0 0 1px var(--danger)}
+.ev-chip[draggable=true]{cursor:grab}
+.ev-chip.dragging,.ev-row.dragging{opacity:.45;cursor:grabbing}
+.ev-chip:focus-visible,.ev-row:focus-visible{outline:2px solid var(--primary);
+  outline-offset:1px}
+
+/* --- the week grid --- */
+.cal-week{display:grid;grid-template-columns:repeat(7,minmax(120px,1fr));
+  min-width:840px}
+.cal-col{border-right:1px solid var(--line-2);padding:0 0 12px;
+  transition:background var(--speed)}
+.cal-col:last-child{border-right:none}
+.cal-col.weekend{background:#f9fafa}
+.cal-col.today{background:var(--primary-soft)}
+.cal-col.drop-over{background:var(--accent-soft)}
+.cal-col-h{display:flex;align-items:baseline;gap:6px;padding:11px 10px 9px;
+  border-bottom:1px solid var(--line-2)}
+.cal-col-h .dow{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--ink-soft);font-weight:700}
+.cal-col-h .dom{font-size:16px;font-weight:800;color:var(--ink)}
+.cal-band{display:flex;flex-direction:column;gap:3px;padding:8px;
+  border-bottom:1px dashed var(--line);min-height:44px}
+.band-empty{margin:0;font-size:11px}
+.cal-timed{display:flex;flex-direction:column;gap:3px;padding:8px}
+
+/* --- full-width event rows (day, agenda, day panel) --- */
+.ev-list{display:flex;flex-direction:column;gap:6px}
+.ev-row{display:flex;align-items:center;gap:11px;padding:11px 13px;
+  border:1px solid var(--line);border-left:4px solid var(--tone);
+  border-radius:var(--radius-sm);background:#fff;min-height:56px}
+.ev-row:hover{box-shadow:var(--shadow-1)}
+.ev-row.late{border-color:var(--danger);border-left-color:var(--danger)}
+.ev-row[draggable=true]{cursor:grab}
+.ev-marker{color:var(--tone);font-size:14px;flex:none;width:16px;text-align:center}
+.ev-when{flex:none;width:78px;font-size:12.5px;color:var(--ink)}
+.ev-when .all-day{font-size:11px;color:var(--ink-soft);text-transform:uppercase;
+  letter-spacing:.06em;font-weight:700}
+.ev-when .to{color:var(--ink-soft)}
+.ev-body{flex:1;min-width:0}
+.ev-title{display:block;font-weight:700;font-size:13.5px;color:var(--ink);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ev-title:hover{color:var(--primary)}
+.ev-meta{font-size:11.5px;color:var(--ink-soft);margin-top:2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ev-meta .ev-kind{color:var(--tone);font-weight:700}
+.ev-meta .sep{margin:0 5px}
+
+/* --- agenda --- */
+.agenda-day{display:flex;gap:16px;padding:14px 0;
+  border-bottom:1px solid var(--line-2)}
+.agenda-day:last-child{border-bottom:none}
+.agenda-day.past{opacity:.72}
+.agenda-day.today .agenda-date .dom{color:var(--primary)}
+.agenda-date{flex:none;width:64px;text-align:center;padding-top:4px}
+.agenda-date .dow{display:block;font-size:10.5px;text-transform:uppercase;
+  letter-spacing:.07em;color:var(--ink-soft);font-weight:700}
+.agenda-date .dom{display:block;font-size:22px;font-weight:800;color:var(--ink);
+  line-height:1.1}
+.agenda-date .mon{display:block;font-size:11px;color:var(--ink-soft)}
+.agenda-date .tag{font-size:9.5px;margin-top:4px}
+.agenda-day .ev-list{flex:1;min-width:0}
+
+/* --- coming up / overdue strips --- */
+.cal-strips{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:18px;margin-top:18px}
+.cal-strips .marker{flex:none;color:var(--tone);font-size:12px;width:14px;
+  text-align:center}
+
+/* --- lazily loaded day panel --- */
+.day-panel{position:fixed;inset:auto 0 0 0;z-index:40;padding:0 16px 16px;
+  display:flex;justify-content:center;pointer-events:none}
+.day-panel .card{width:100%;max-width:640px;max-height:64vh;overflow:auto;
+  box-shadow:var(--shadow-pop);pointer-events:auto}
+
+@media(max-width:900px){
+  .cal-strips{grid-template-columns:minmax(0,1fr)}
+  .cal-cell{height:96px}
+  .agenda-date{width:52px}
+  .ev-when{width:62px}
+  .day-panel .card{max-height:72vh}
+}
+
+/* ---------- workspace switcher (topbar) ----------
+   Present only for a home super admin. The `.away` state is deliberately loud:
+   when somebody is looking at a partner's workspace rather than our own, every
+   number on the page means something different, and a quiet control would let
+   that go unnoticed for a whole session. */
+.ws-switch{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 4px 0 10px;
+  border:1px solid var(--line);border-radius:9px;background:var(--card)}
+.ws-switch .ws-dot{width:8px;height:8px;border-radius:50%;flex:none;
+  background:var(--ws-color,var(--primary))}
+.ws-switch select{border:0;background:transparent;font:inherit;font-size:13px;
+  font-weight:600;color:var(--ink);padding:0 4px;max-width:180px;cursor:pointer}
+.ws-switch select:focus-visible{outline:2px solid var(--primary-ring);outline-offset:2px;
+  border-radius:6px}
+.ws-switch.away{background:var(--accent-soft);border-color:#e8d5a6}
+.ws-switch.away select{color:var(--warn)}
+
+/* ---------- workspace admin ---------- */
+.ws-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+.ws-card{position:relative;padding:18px;border:1px solid var(--line);border-radius:12px;
+  background:var(--card);overflow:hidden}
+.ws-card::before{content:"";position:absolute;inset:0 auto 0 0;width:4px;
+  background:var(--ws-color,var(--primary))}
+.ws-card h3{margin:0 0 2px;font-size:15px;display:flex;align-items:center;gap:8px}
+.ws-card .ws-meta{color:var(--ink-soft);font-size:12px;margin-bottom:14px}
+.ws-card .ws-stats{display:flex;gap:18px;margin-bottom:14px}
+.ws-card .ws-stats b{display:block;font-size:19px;line-height:1.2}
+.ws-card .ws-stats span{font-size:11px;color:var(--ink-faint);text-transform:uppercase;
+  letter-spacing:.04em}
+.ws-people{max-height:180px;overflow:auto;border:1px solid var(--line-2);border-radius:8px;
+  padding:8px;margin-bottom:10px}
+.ws-people label{display:flex;align-items:center;gap:8px;padding:3px 2px;font-size:13px}
+@media (max-width:900px){
+  .ws-switch select{max-width:110px}
+}
+
+/* ---------- leave balance / salary summary strip ----------
+   Big numbers first: on both screens the question is "how many do I have
+   left", and it should be answerable without reading a table. */
+.lv-balance{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.lv-stat{flex:1 1 150px;padding:14px 16px;border:1px solid var(--line);
+  border-radius:12px;background:var(--card)}
+.lv-stat b{display:block;font-size:26px;line-height:1.15;color:var(--ink)}
+.lv-stat span{font-size:11px;color:var(--ink-faint);text-transform:uppercase;
+  letter-spacing:.04em}
+.lv-stat.over{background:var(--danger-soft);border-color:#f0d5d5}
+.lv-stat.over b{color:var(--danger)}
+.lv-stat.pending{background:var(--warn-soft);border-color:#f2dfba}
+.lv-stat.pending b{color:var(--warn)}
+
+/* ---------- payroll month ----------
+   The screen used to hold a permanently open payment form and a permanently
+   open adjustment row for every unpaid person: six controls per employee, all
+   competing, none of them the thing you came to read. The numbers are the page
+   now, and the forms open on the one row being settled. */
+.pr-month{display:flex;gap:8px;align-items:center;flex:none}
+.pr-month input{padding:8px 12px;border:1px solid var(--line);border-radius:9px;
+  background:#fff;font:inherit;font-size:13px;color:var(--ink)}
+.pr-month input:focus{outline:none;border-color:var(--primary);
+  box-shadow:0 0 0 3px var(--primary-ring)}
+.pr-run{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
+
+.pr-summary{display:grid;gap:12px;margin-bottom:12px;
+  grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.pr-stat{padding:14px 16px;border:1px solid var(--line);border-radius:12px;
+  background:var(--card);box-shadow:var(--shadow-1)}
+.pr-stat span{display:block;font-size:10.5px;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--ink-faint)}
+/* Tabular figures: four money cards side by side that jiggle as the digits
+   change read as four unrelated numbers. */
+.pr-stat b{display:block;margin-top:5px;font-size:25px;line-height:1.15;
+  font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.pr-stat small{display:block;margin-top:2px;font-size:11.5px;color:var(--ink-soft)}
+.pr-stat.is-paid b{color:var(--ok)}
+.pr-stat.is-due{background:var(--warn-soft);border-color:#f2dfba}
+.pr-stat.is-due b{color:var(--warn)}
+
+.pr-progress{height:6px;border-radius:4px;background:var(--line);overflow:hidden;
+  margin-bottom:18px}
+.pr-progress span{display:block;height:100%;border-radius:4px;background:var(--ok)}
+
+.ta-r{text-align:right}
+/* Money in the mono face, tabular, so a column of amounts lines up on its
+   digits and a longer number is visibly longer rather than merely different. */
+.pr-num{font-family:var(--mono);font-variant-numeric:tabular-nums;
+  white-space:nowrap;font-size:12.5px}
+.pr-net strong{font-size:14px}
+.pr-plus{color:var(--ok);font-weight:600}
+.pr-minus{color:var(--danger)}
+.pr-dash{color:var(--ink-faint)}
+.pr-note{font-family:var(--sans);white-space:normal;max-width:180px;
+  margin-left:auto;font-size:11.5px}
+.pr-leave{white-space:nowrap}
+.pr-table tbody tr.is-paid td{background:#fbfdfc}
+.pr-table tbody tr.is-paid strong{color:var(--ink-soft)}
+.pr-table tbody tr.pr-row.is-open td{background:var(--primary-soft)}
+.pr-table tbody tr.pr-row.is-open+.pr-drawer>td{border-top:none}
+.pr-foot-split{display:flex;flex-direction:column;align-items:flex-end;gap:2px;
+  font-family:var(--mono);font-size:11.5px;font-weight:700;text-transform:none;
+  letter-spacing:0}
+.pr-foot-ok{color:var(--ok)}
+.pr-foot-due{color:var(--warn)}
+
+.pr-toggle{white-space:nowrap}
+.pr-chev{width:13px;height:13px;transition:transform var(--speed)}
+.pr-toggle.is-open .pr-chev{transform:rotate(180deg)}
+
+/* The drawer is a row of the same table, so it stays tied to the person it
+   belongs to even when the table is scrolled sideways on a narrow screen —
+   which an absolutely positioned popover inside `.table-wrap` would not, being
+   clipped by its own scroll container. */
+.pr-drawer>td{background:var(--primary-soft);padding:14px 20px;
+  box-shadow:inset 0 1px 0 rgba(0,121,91,.16)}
+.pr-panels{display:grid;gap:12px;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr)}
+@media(max-width:900px){.pr-panels{grid-template-columns:minmax(0,1fr)}}
+.pr-panel{background:#fff;border:1px solid var(--line);border-radius:10px;
+  padding:13px 15px;box-shadow:var(--shadow-1)}
+.pr-panel h4{font-size:12px;font-weight:700;letter-spacing:.04em;
+  text-transform:uppercase;color:var(--ink-soft);margin-bottom:10px}
+.pr-panel h4 em{font-style:normal;font-weight:600;text-transform:none;
+  letter-spacing:0;color:var(--ink-faint);margin-left:6px}
+.pr-fields{display:flex;gap:10px;flex-wrap:wrap}
+.pr-f{display:flex;flex-direction:column;gap:4px;flex:1 1 140px;min-width:0}
+.pr-f-wide{flex:2 1 200px}
+.pr-f>span{font-size:11px;font-weight:700;letter-spacing:.05em;
+  text-transform:uppercase;color:var(--ink-faint)}
+.pr-f>span i{font-style:normal;font-weight:500;text-transform:none;
+  letter-spacing:0;color:var(--ink-faint);opacity:.8}
+.pr-f input,.pr-f select{width:100%;padding:8px 11px;border:1px solid var(--line);
+  border-radius:8px;background-color:#fff;font:inherit;font-size:13px;color:var(--ink);
+  transition:border-color var(--speed),box-shadow var(--speed)}
+.pr-f select{padding-right:30px}
+.pr-f input:focus,.pr-f select:focus{outline:none;border-color:var(--primary);
+  box-shadow:0 0 0 3px var(--primary-ring)}
+/* The rupee sign lives in the field rather than the label, so an amount box
+   can never be mistaken for a day count. */
+.pr-amount{position:relative;display:block}
+.pr-amount i{position:absolute;left:10px;top:50%;transform:translateY(-50%);
+  font-style:normal;font-family:var(--mono);color:var(--ink-faint);font-size:12.5px}
+.pr-amount input{padding-left:24px;font-family:var(--mono)}
+.pr-panel-foot{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:11px}
+.pr-panel-foot .hint{font-size:11.5px;min-width:0}
+.pr-preview{display:block;color:var(--primary-strong);font-weight:600}
+
+/* Count beside a sidebar item (leave approvals waiting on you). */
+.side a .nav-count{margin-left:auto;min-width:18px;height:18px;padding:0 5px;
+  border-radius:9px;background:var(--accent);color:#3a2c07;font-size:10px;
+  font-weight:800;line-height:18px;text-align:center}
+
+/* ---------- privacy mask (business overview) ----------
+   The figures are masked by default and revealed deliberately. A blur rather
+   than a hidden panel: the shape of the page stays put, so nothing jumps when
+   you reveal, and it is obvious that something is being withheld rather than
+   missing. `user-select:none` stops a masked figure being copied out, and
+   pointer-events keeps a blurred chart from being hovered for its tooltip.
+
+   The blur is the DEFAULT and `.is-revealed` lifts it — never the other way
+   round. It was written the other way first, with a script adding a `.is-masked`
+   class on load, and that script sat behind a charting library in the page: the
+   browser painted real revenue, spent a few hundred milliseconds fetching
+   Chart.js, and only then blurred it. Masking in CSS means the safe state is
+   the first painted frame, and no script can be slow enough to matter. */
+[data-private]{filter:blur(9px);opacity:.55;user-select:none;pointer-events:none;
+  transition:filter var(--speed,.18s) ease, opacity var(--speed,.18s) ease}
+[data-private].is-revealed{filter:none;opacity:1;user-select:auto;
+  pointer-events:auto}
+@media (prefers-reduced-motion:reduce){
+  [data-private]{transition:none}
+}
+
+/* ============================================================================
+   Executive dashboard
+   ---------------------------------------------------------------------------
+   One screen, read top to bottom: headline tiles, the score's breakdown, the
+   operational strip, the briefs, what is wrong, then the evidence and detail.
+   The band colours (healthy / monitor / risk) are the same three everywhere on
+   the page, because a "healthy" client and a "healthy" department are scored
+   against the same cut-offs in analytics/executive.py — if these drift apart
+   from BAND_HEALTHY / BAND_MONITOR the page starts lying quietly.
+   ========================================================================= */
+
+/* Band tokens. Declared once and referenced by chip, bar, card and row, so
+   there is one place to change what "at risk" looks like. */
+.band-healthy{--band:var(--ok);--band-soft:var(--ok-soft)}
+.band-monitor{--band:var(--warn);--band-soft:var(--warn-soft)}
+.band-risk{--band:var(--danger);--band-soft:var(--danger-soft)}
+.band-unknown{--band:var(--ink-faint);--band-soft:#eff0f0}
+
+/* ---------- headline tiles ---------- */
+/* minmax(200px,1fr): four tiles sit in a row on a laptop, two on a tablet and
+   one on a phone without a breakpoint for each case. */
+.exec-tiles{display:grid;gap:16px;margin-bottom:20px;
+  grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.exec-tile{background:var(--card);border:1px solid var(--line);
+  border-radius:var(--radius);padding:20px;box-shadow:var(--shadow-1);
+  position:relative;overflow:hidden;
+  transition:box-shadow var(--speed),transform var(--speed)}
+.exec-tile:hover{box-shadow:var(--shadow-2);transform:translateY(-1px)}
+/* The band shows as a rail down the leading edge rather than as a tinted
+   card: a full wash reads as an error state on a tile that is merely being
+   scored, and four washed tiles side by side read as four problems. */
+.exec-tile[class*="band-"]::before{content:"";position:absolute;inset:0 auto 0 0;
+  width:3px;background:var(--band)}
+.exec-tile .t-label{font-size:11px;text-transform:uppercase;letter-spacing:.1em;
+  font-weight:700;color:var(--ink-soft)}
+.exec-tile .t-value{font-family:var(--mono);font-size:31px;font-weight:800;
+  letter-spacing:-.03em;margin-top:10px;line-height:1.1;overflow-wrap:anywhere}
+.exec-tile[class*="band-"] .t-value{color:var(--band)}
+.exec-tile .t-unit{font-size:15px;font-weight:600;color:var(--ink-faint);
+  margin-left:2px}
+.exec-tile .t-note{font-size:11.5px;color:var(--ink-soft);margin-top:8px;
+  line-height:1.55}
+
+/* ---------- health breakdown ---------- */
+.exec-health{margin-bottom:20px}
+.health-parts{display:grid;gap:18px;
+  grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+.health-part.unscored{opacity:.6}
+.hp-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.hp-label{font-size:12.5px;font-weight:700}
+.hp-score{font-family:var(--mono);font-size:15px;font-weight:800;color:var(--band)}
+.health-part.unscored .hp-score{font-size:11px;font-weight:600;
+  text-transform:uppercase;letter-spacing:.07em}
+.hp-track{height:6px;border-radius:3px;background:var(--line-2);margin-top:9px;
+  overflow:hidden}
+.hp-fill{display:block;height:100%;border-radius:3px;background:var(--band);
+  transition:width .4s ease}
+.hp-note{font-size:11.5px;color:var(--ink-soft);margin-top:9px;line-height:1.55}
+.hp-weight{font-size:10.5px;color:var(--ink-faint);margin-top:5px;
+  letter-spacing:.02em}
+
+/* Sub-label under a stat's own label - the "3 at risk / 1 past target" line.
+   The operational strip reuses .stat rather than inventing a fourth card. */
+.stat .s{font-size:11px;color:var(--ink-faint);margin-top:7px;line-height:1.5}
+
+/* ---------- briefs ---------- */
+/* Two columns that collapse together: the arithmetic brief and the model's
+   paragraph are meant to be read side by side, and stacking them on a phone
+   keeps the arithmetic one first. */
+.exec-briefs{display:grid;gap:16px;margin-top:4px;
+  grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.brief-list{list-style:none;display:grid;gap:11px}
+.brief-list li{position:relative;padding-left:18px;font-size:13px;
+  line-height:1.6;color:var(--ink)}
+.brief-list li::before{content:"";position:absolute;left:0;top:8px;width:6px;
+  height:6px;border-radius:50%;background:var(--primary)}
+.brief-ai{font-size:13px;line-height:1.7;color:var(--ink)}
+
+/* ---------- alerts ---------- */
+.alert-list{display:grid;gap:12px}
+.alert-row{border:1px solid var(--line);border-left:3px solid var(--ink-faint);
+  border-radius:var(--radius-sm);padding:15px 17px;background:#fbfdfc}
+.alert-row.level-critical{border-left-color:var(--danger);background:var(--danger-soft)}
+.alert-row.level-warning{border-left-color:var(--warn);background:var(--warn-soft)}
+.alert-row.level-monitor{border-left-color:var(--info);background:var(--info-soft)}
+.alert-row.level-healthy{border-left-color:var(--ok);background:var(--ok-soft)}
+.a-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.a-level{font-size:10px;font-weight:800;text-transform:uppercase;
+  letter-spacing:.11em;padding:3px 8px;border-radius:20px;
+  background:rgba(255,255,255,.75);color:var(--ink-soft)}
+.level-critical .a-level{color:var(--danger)}
+.level-warning .a-level{color:var(--warn)}
+.level-monitor .a-level{color:var(--info)}
+.level-healthy .a-level{color:var(--ok)}
+.a-title{font-size:13.5px;font-weight:700}
+.a-body{font-size:12.5px;line-height:1.65;color:var(--ink-soft);margin-top:8px}
+.a-foot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}
+.a-metric{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft)}
+/* Pushes the button to the trailing edge on a wide row and lets it sit inline
+   once the row wraps, rather than stranding it on a line of its own. */
+.a-foot .btn{margin-left:auto}
+@media(max-width:520px){.a-foot .btn{margin-left:0}}
+
+/* ---------- watchlist / accounts ---------- */
+/* 560px is the min-width the tables inside these cards declare, so anything
+   narrower clips the last column header ("Outstanding" -> "OUTS'") and makes a
+   working table look broken. Matching the two means the pair sits side by side
+   on a wide monitor and stacks -- full width, fully legible -- as soon as it
+   cannot. */
+.exec-tables{display:grid;gap:16px;margin-top:18px;
+  grid-template-columns:repeat(auto-fit,minmax(560px,1fr))}
+.score-chip{display:inline-block;min-width:34px;text-align:center;
+  font-family:var(--mono);font-size:11.5px;font-weight:700;padding:3px 8px;
+  border-radius:20px;background:var(--band-soft);color:var(--band)}
+.risk{display:inline-block;font-size:10.5px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.08em;padding:2px 8px;
+  border-radius:20px}
+.risk-low{background:var(--ok-soft);color:var(--ok)}
+.risk-medium{background:var(--warn-soft);color:var(--warn)}
+.risk-high{background:var(--danger-soft);color:var(--danger)}
+/* The reasons behind a risk label, on their own line: they are the difference
+   between a badge you trust and one you scroll past. */
+.risk-why{display:block;font-size:10.5px;color:var(--ink-faint);margin-top:4px;
+  line-height:1.45}
+
+/* ---------- department scorecards ---------- */
+.scorecards{display:grid;gap:14px;
+  grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+.scorecard{border:1px solid var(--line);border-top:3px solid var(--band);
+  border-radius:var(--radius-sm);padding:15px 16px;background:#fbfdfc}
+.sc-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.sc-name{font-size:13px;font-weight:700}
+.sc-score{font-family:var(--mono);font-size:19px;font-weight:800;color:var(--band)}
+.sc-people{font-size:11px;color:var(--ink-faint);margin-top:2px}
+.sc-stats{display:grid;grid-template-columns:1fr 1fr;gap:9px 12px;margin-top:13px}
+.sc-stats dt{font-size:10px;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--ink-soft);font-weight:600}
+.sc-stats dd{font-family:var(--mono);font-size:13px;font-weight:700;margin-top:2px}
+
+/* ---------- the honesty note ---------- */
+/* Deliberately the quietest card on the page. It has to be findable by someone
+   looking for a missing tile and ignorable by everyone else. */
+.exec-gaps{margin-top:18px;background:transparent;box-shadow:none;
+  border-style:dashed}
+.exec-gaps .card-h h3{font-size:12px;color:var(--ink-soft);font-weight:700}
+.exec-gaps .hint{line-height:1.7}
+
+@media(prefers-reduced-motion:reduce){
+  .exec-tile,.hp-fill{transition:none}
+  .exec-tile:hover{transform:none}
+}
+
+/* ============================================================================
+   Executive dashboard - layout additions
+   ---------------------------------------------------------------------------
+   Appended after the first executive block. Everything here is layout and the
+   dark AI panel; the band tokens and the alert/scorecard colours are defined
+   above and reused unchanged.
+   ========================================================================= */
+
+/* ---------- page head ---------- */
+.exec-head{align-items:flex-start}
+.exec-meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:11px}
+.em-chip{display:inline-flex;align-items:center;gap:6px;font-size:11px;
+  font-weight:600;color:var(--ink-soft);background:var(--card);
+  border:1px solid var(--line);border-radius:20px;padding:4px 11px}
+.em-chip.live{color:var(--ok);border-color:rgba(18,138,72,.28);
+  background:var(--ok-soft)}
+.em-chip.live .dot{width:6px;height:6px;border-radius:50%;
+  background:currentColor}
+
+/* ---------- headline tiles: delta badge ---------- */
+.exec-tile .t-top{display:flex;align-items:center;justify-content:space-between;
+  gap:10px}
+.t-delta{display:inline-flex;align-items:center;gap:3px;font-family:var(--mono);
+  font-size:11px;font-weight:700;padding:2px 7px;border-radius:20px;
+  white-space:nowrap}
+.t-delta svg{width:12px;height:12px}
+/* Direction is coloured, not judged. Revenue down is bad and outstanding down
+   is good, and this component cannot tell which tile it is on -- so up is
+   green, down is red, and the tile's own note carries the meaning. */
+.t-delta.d-up{background:var(--ok-soft);color:var(--ok)}
+.t-delta.d-down{background:var(--danger-soft);color:var(--danger)}
+.t-delta.d-flat{background:#eff0f0;color:var(--ink-soft)}
+
+/* ---------- operational strip ---------- */
+.exec-strip{display:grid;gap:12px;margin-bottom:20px;
+  grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.strip-stat{background:var(--card);border:1px solid var(--line);
+  border-radius:var(--radius-sm);padding:13px 15px}
+.strip-stat.tone-warn{border-color:rgba(163,105,8,.3);background:var(--warn-soft)}
+.ss-label{font-size:10px;text-transform:uppercase;letter-spacing:.1em;
+  font-weight:700;color:var(--ink-soft)}
+.ss-value{font-family:var(--mono);font-size:22px;font-weight:800;
+  letter-spacing:-.02em;margin-top:6px;overflow-wrap:anywhere}
+.strip-stat.tone-warn .ss-value{color:var(--warn)}
+.ss-note{font-size:11px;color:var(--ink-faint);margin-top:4px;line-height:1.45}
+
+/* ---------- AI business brief (dark panel) ---------- */
+/* The one dark surface in the content area. It is the only block on the page
+   whose prose is not arithmetic, and looking different is how a reader keeps
+   track of which is which. */
+.ai-brief{background:var(--chrome);color:#d4d9d6;border-radius:var(--radius);
+  padding:22px 24px;margin-bottom:20px;box-shadow:var(--shadow-2)}
+.ab-head{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap}
+.ab-mark{flex:none;width:34px;height:34px;border-radius:9px;
+  display:grid;place-items:center;color:var(--brand-green);
+  background:rgba(23,227,129,.13);border:1px solid rgba(23,227,129,.25)}
+.ab-mark svg{width:19px;height:19px}
+.ab-title{flex:1 1 240px;min-width:0}
+.ab-title h3{font-size:14.5px;font-weight:700;color:#fff;
+  display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.ab-title p{font-size:11.5px;color:#969d9a;margin-top:3px}
+.ab-badge{font-size:9.5px;font-weight:800;text-transform:uppercase;
+  letter-spacing:.11em;padding:3px 8px;border-radius:20px;
+  background:rgba(23,227,129,.15);color:var(--brand-green);white-space:nowrap}
+.ab-scope{flex:none;font-size:11px;color:#848c88;text-align:right;
+  padding-top:4px}
+.ab-lede{font-size:14px;line-height:1.65;color:#ebedec;margin-top:18px;
+  font-weight:500}
+
+.ab-facts{display:grid;gap:10px;margin-top:18px;
+  grid-template-columns:repeat(auto-fit,minmax(270px,1fr))}
+.ab-fact{position:relative;font-size:12px;line-height:1.55;color:#bdc2c0;
+  background:var(--chrome-2);border:1px solid var(--chrome-line);
+  border-radius:var(--radius-sm);padding:12px 14px 12px 30px}
+.ab-fact .dot{position:absolute;left:13px;top:17px;width:6px;height:6px;
+  border-radius:50%;background:var(--brand-green)}
+
+.ab-actions-label{font-size:10px;text-transform:uppercase;letter-spacing:.12em;
+  font-weight:800;color:#848c88;margin-top:22px}
+.ab-actions{display:grid;gap:12px;margin-top:11px;
+  grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.ab-action{display:flex;gap:12px;text-decoration:none;
+  background:var(--chrome-2);border:1px solid var(--chrome-line);
+  border-left:3px solid var(--ink-faint);border-radius:var(--radius-sm);
+  padding:14px 15px;transition:border-color var(--speed),background var(--speed)}
+.ab-action:hover{background:#1c2420;border-color:rgba(255,255,255,.16)}
+.ab-action.level-critical{border-left-color:#e06666}
+.ab-action.level-warning{border-left-color:var(--accent)}
+.ab-action.level-monitor{border-left-color:#6fb3cc}
+.aa-index{flex:none;width:21px;height:21px;border-radius:50%;
+  display:grid;place-items:center;font-family:var(--mono);font-size:11px;
+  font-weight:800;color:var(--chrome);background:var(--brand-green)}
+.aa-body{display:block;min-width:0}
+.aa-title{display:block;font-size:12.5px;font-weight:700;color:#fff}
+.aa-text{display:block;font-size:11.5px;line-height:1.55;color:#a4ada8;
+  margin-top:5px}
+.aa-metric{display:block;font-family:var(--mono);font-size:10.5px;
+  color:var(--brand-green);margin-top:8px}
+.ab-foot{font-size:10.5px;color:#747b78;margin-top:18px;line-height:1.6;
+  border-top:1px solid var(--chrome-line);padding-top:13px}
+
+/* ---------- section heads between blocks ---------- */
+.section-head{display:flex;align-items:flex-start;justify-content:space-between;
+  gap:14px;flex-wrap:wrap;margin:26px 0 14px}
+.section-head h3{font-family:var(--display);font-size:15px;font-weight:600}
+.section-head p{font-size:11.5px;color:var(--ink-soft);margin-top:3px}
+
+/* ---------- chart rows ---------- */
+/* `wide-first` gives the lead chart two thirds. Both collapse to one column
+   below 900px rather than squeezing a time axis into 300px, where the labels
+   overlap and the chart stops being readable at all. */
+.exec-row{display:grid;gap:16px;margin-bottom:16px}
+.exec-row.wide-first{grid-template-columns:2fr 1fr}
+.exec-row.three{grid-template-columns:repeat(3,1fr)}
+@media(max-width:1180px){
+  .exec-row.three{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:900px){
+  .exec-row.wide-first,.exec-row.three{grid-template-columns:1fr}
+}
+
+/* ---------- alerts as a grid ---------- */
+.alert-grid{display:grid;gap:12px;
+  grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.alert-grid .a-head{justify-content:space-between}
+.alert-grid .a-title{font-size:13.5px;font-weight:700;margin-top:10px}
+.alert-grid .a-foot{justify-content:space-between}
+.alert-grid .a-foot .btn{margin-left:0}
+
+/* ---------- department scorecards ---------- */
+/* auto-FILL, not auto-fit: with one department on a fresh install auto-fit
+   collapses the empty tracks and stretches that single card across the whole
+   page, which reads as a headline rather than as one of five. */
+.scorecards{display:grid;gap:14px;
+  grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
+.scorecard{background:var(--card);box-shadow:var(--shadow-1)}
+.scorecard .sc-head{align-items:flex-start}
+.sc-score{font-family:var(--mono);font-size:23px;font-weight:800;
+  color:var(--band);line-height:1}
+.sc-metric{margin-top:13px}
+.scm-top{display:flex;justify-content:space-between;font-size:11px;
+  color:var(--ink-soft);font-weight:600}
+.scm-top span:last-child{font-family:var(--mono);color:var(--ink);
+  font-weight:700}
+.scm-track{height:5px;border-radius:3px;background:var(--line-2);margin-top:5px;
+  overflow:hidden}
+.scm-fill{display:block;height:100%;border-radius:3px;background:var(--band)}
+.scm-fill.alt{background:var(--primary)}
+.sc-foot{display:flex;justify-content:space-between;gap:8px;font-size:10.5px;
+  color:var(--ink-faint);margin-top:14px;padding-top:11px;
+  border-top:1px solid var(--line-2)}
+
+@media(max-width:620px){
+  .ai-brief{padding:18px 16px}
+  .ab-scope{text-align:left;width:100%}
+}

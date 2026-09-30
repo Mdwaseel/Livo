@@ -1,0 +1,209 @@
+{% load client_calendar_tags %}
+{% comment %}
+The calendar itself — shared, unchanged, by the page a client opens and the
+planner the team works in. `mode` is "public" or "planner"; the planner adds
+"add on this day" buttons and edit links, and nothing else differs, so what the
+team plans on is what the client sees.
+
+Works with no JavaScript at all: both layouts render, and every day in the grid
+is a link to that day in the list. The script turns the grid's days into a
+sheet that slides in, and hides whichever layout isn't chosen.
+{% endcomment %}
+
+<div class="cc-monthbar">
+  <div>
+    <p class="cc-eyebrow">{% if mode == 'public' %}Your plan for{% else %}Planning{% endif %}</p>
+    <h2 class="cc-month-title">{{ window.start|date:"F" }} <span>{{ window.start|date:"Y" }}</span></h2>
+  </div>
+  <nav class="cc-stepper" aria-label="Change month">
+    <a class="cc-icon-btn" href="{{ prev_url }}" rel="prev" aria-label="Previous month">{% cc_icon "chevron_left" %}</a>
+    {% if not is_current_month %}<a class="cc-btn" href="{{ today_url }}">This month</a>{% endif %}
+    <a class="cc-icon-btn" href="{{ next_url }}" rel="next" aria-label="Next month">{% cc_icon "chevron_right" %}</a>
+  </nav>
+</div>
+
+<section class="cc-stats" aria-label="{{ window.start|date:'F' }} at a glance">
+  <div class="cc-stat">
+    <span class="cc-stat-l">Scheduled</span>
+    <strong class="cc-stat-n">{{ summary.total }}</strong>
+    <span class="cc-stat-s">activit{{ summary.total|pluralize:"y,ies" }} in {{ window.start|date:"F" }}</span>
+  </div>
+  <div class="cc-stat">
+    <span class="cc-stat-l">Delivered</span>
+    <strong class="cc-stat-n">{{ summary.done }}<small> / {{ summary.total }}</small></strong>
+    <div class="cc-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100"
+         aria-valuenow="{{ summary.percent }}" aria-label="{{ summary.percent }}% of this month delivered">
+      <span style="width:{{ summary.percent }}%"></span>
+    </div>
+    <span class="cc-stat-s">{{ summary.percent }}% of the plan</span>
+  </div>
+  <a class="cc-stat{% if summary.approval %} is-hot{% endif %}" href="{{ approval_url }}">
+    <span class="cc-stat-l">{% if mode == 'public' %}Needs your approval{% else %}Awaiting client approval{% endif %}</span>
+    <strong class="cc-stat-n">{{ summary.approval }}</strong>
+    <span class="cc-stat-s">{% if summary.approval %}{% if mode == 'public' %}Tap to review{% else %}Show them{% endif %}{% else %}All clear{% endif %}</span>
+  </a>
+  <div class="cc-stat">
+    <span class="cc-stat-l">Coming up</span>
+    <strong class="cc-stat-n">{{ upcoming }}</strong>
+    <span class="cc-stat-s">in the next 7 days</span>
+  </div>
+</section>
+
+<div class="cc-toolbar">
+  <div class="cc-seg" role="group" aria-label="Layout">
+    <a class="cc-seg-btn" href="{{ grid_url }}" data-cc-set-view="grid">{% cc_icon "calendar" %}Calendar</a>
+    <a class="cc-seg-btn" href="{{ list_url }}" data-cc-set-view="list">{% cc_icon "list" %}List</a>
+  </div>
+  <div class="cc-chips" role="group" aria-label="Show activity type">
+    <a class="cc-chip{% if not filters.family %} is-on{% endif %}" href="{{ all_types_url }}"{% if not filters.family %} aria-current="true"{% endif %}>All <span>{{ summary.total }}</span></a>
+    {% for family in families %}{% if family.count or family.selected %}
+    <a class="cc-chip fam-{{ family.key }}{% if family.selected %} is-on{% endif %}" href="{{ family.url }}"{% if family.selected %} aria-current="true"{% endif %}>
+      <i class="cc-swatch" aria-hidden="true"></i>{{ family.label }} <span>{{ family.count }}</span></a>
+    {% endif %}{% endfor %}
+  </div>
+  {% if projects|length > 1 %}
+  <form class="cc-project" method="get">
+    <label class="cc-sr" for="cc-project">Project</label>
+    <select id="cc-project" name="project" onchange="this.form.submit()">
+      <option value="">All projects</option>
+      {% for project in projects %}<option value="{{ project.pk }}"{% if project.selected %} selected{% endif %}>{{ project.name }}</option>{% endfor %}
+    </select>
+    <input type="hidden" name="date" value="{{ filters.anchor|date:'Y-m' }}">
+    {% if filters.family %}<input type="hidden" name="type" value="{{ filters.family }}">{% endif %}
+    {% if filters.status %}<input type="hidden" name="status" value="{{ filters.status }}">{% endif %}
+    {% if filters.view %}<input type="hidden" name="view" value="{{ filters.view }}">{% endif %}
+    <noscript><button class="cc-btn" type="submit">Show</button></noscript>
+  </form>
+  {% endif %}
+</div>
+
+{% if filters.status %}
+<p class="cc-note">Showing only activities {% if filters.status == 'APPROVAL' and mode == 'public' %}that need your approval{% else %}marked “{{ status_filter_label|lower }}”{% endif %}.
+  <a href="{{ clear_status_url }}">Show everything</a></p>
+{% endif %}
+
+{% if not summary.total and not is_filtered %}
+<div class="cc-empty">
+  {% cc_icon "calendar" "cc-ico cc-empty-ico" %}
+  {% if mode == 'public' %}
+    <h3>{{ window.start|date:"F" }} is still being planned</h3>
+    <p>Nothing is scheduled here yet. As soon as we plan your posts, campaigns and reports for this month, they'll appear on this page.</p>
+  {% else %}
+    <h3>Nothing planned for {{ window.start|date:"F" }} yet</h3>
+    <p>Add the month's posts, stories, ad changes and reports. Everything you add is visible to the client unless you untick it.</p>
+    {% if can_plan %}<a class="cc-btn cc-btn-primary" href="{% url 'client_calendar:activity_create' client.pk %}?date={% if is_current_month %}{{ today|date:'Y-m-d' }}{% else %}{{ window.start|date:'Y-m-d' }}{% endif %}">{% cc_icon "plus" %}Plan the first activity</a>{% endif %}
+  {% endif %}
+</div>
+{% elif not month_days and is_filtered %}
+<div class="cc-empty">
+  {% cc_icon "calendar" "cc-ico cc-empty-ico" %}
+  <h3>Nothing matches in {{ window.start|date:"F" }}</h3>
+  <p>No activities of this kind this month.</p>
+  <a class="cc-btn" href="{{ clear_url }}">Clear filters</a>
+</div>
+{% endif %}
+
+{# ---------------- grid ---------------- #}
+<section class="cc-view cc-view-grid" aria-label="Month calendar">
+  <div class="cc-grid">
+    <div class="cc-dow" aria-hidden="true">
+      <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+    </div>
+    <div class="cc-cells">
+      {% for week in weeks %}{% for cell in week %}
+      <div class="cc-cell{% if cell.is_today %} is-today{% endif %}{% if cell.is_other %} is-other{% endif %}{% if cell.is_past %} is-past{% endif %}{% if cell.count %} has-items{% endif %}{% if cell.approvals %} has-approval{% endif %}">
+        {% if cell.count %}<a class="cc-hit" href="#d-{{ cell.iso }}" data-cc-day="{{ cell.iso }}" aria-label="{{ cell.label }}"></a>{% endif %}
+        <div class="cc-cell-top">
+          <span class="cc-num"{% if not cell.count %} aria-label="{{ cell.label }}"{% endif %}>{{ cell.date.day }}</span>
+          {% if cell.is_today %}<span class="cc-today-tag">Today</span>{% endif %}
+          {% if mode == 'planner' and can_plan %}
+          <a class="cc-add" href="{% url 'client_calendar:activity_create' client.pk %}?date={{ cell.iso }}"
+             aria-label="Add an activity on {{ cell.date|date:'l j F' }}">{% cc_icon "plus" %}</a>
+          {% endif %}
+        </div>
+        {% if cell.count %}
+        <ul class="cc-pills" aria-hidden="true">
+          {% for a in cell.shown %}
+          <li class="cc-pill fam-{{ a.family }} st-{{ a.status|lower }}{% if not a.show_to_client %} is-hidden{% endif %}">
+            {% cc_icon a.kind_icon %}<span class="cc-pill-t">{{ a.title }}</span>{% if a.is_done %}{% cc_icon "check" "cc-ico cc-pill-done" %}{% elif a.needs_approval %}{% cc_icon "alert" "cc-ico cc-pill-flag" %}{% endif %}
+          </li>
+          {% endfor %}
+          {% if cell.more %}<li class="cc-pill-more">+{{ cell.more }} more</li>{% endif %}
+        </ul>
+        <span class="cc-dots" aria-hidden="true">{% for a in cell.items|slice:":4" %}<i class="fam-{{ a.family }}"></i>{% endfor %}{% if cell.count > 4 %}<b>+</b>{% endif %}</span>
+        {% endif %}
+      </div>
+      {% endfor %}{% endfor %}
+    </div>
+  </div>
+  <div class="cc-legend" aria-hidden="true">
+    <span>{% cc_icon "check" "cc-ico cc-lg-done" %}{% if mode == 'public' %}Published or done{% else %}Done{% endif %}</span>
+    <span><i class="cc-lg-pill is-approval"></i>{% if mode == 'public' %}Needs your approval{% else %}Awaiting approval{% endif %}</span>
+    <span><i class="cc-lg-pill is-postponed"></i>Postponed</span>
+    {% if mode == 'planner' %}<span><i class="cc-lg-pill is-hidden"></i>Hidden from client</span>{% endif %}
+  </div>
+  {% comment %}
+  Phones only (CSS). On a small grid a busy day is a number with coloured dots,
+  which says "something" but not what — so the next few days are spelled out
+  underneath, and each opens the same day sheet as tapping the date.
+  {% endcomment %}
+  {% if agenda %}
+  <section class="cc-agenda" aria-labelledby="cc-agenda-h">
+    <h3 class="cc-agenda-h" id="cc-agenda-h">{% if is_current_month %}Next up{% else %}First up in {{ window.start|date:"F" }}{% endif %}
+      <a href="{{ list_url }}" data-cc-set-view="list">See all</a></h3>
+    <ul class="cc-agenda-list">
+      {% for day in agenda %}
+      <li><a class="cc-agenda-day{% if day.is_today %} is-today{% endif %}" href="#d-{{ day.iso }}" data-cc-day="{{ day.iso }}">
+        <span class="cc-agenda-date" aria-hidden="true"><b>{{ day.date.day }}</b><small>{% if day.is_today %}Today{% else %}{{ day.date|date:"D" }}{% endif %}</small></span>
+        <span class="cc-agenda-items">
+          <span class="cc-sr">{{ day.label }}: </span>
+          {% for a in day.items|slice:":2" %}<span class="cc-agenda-item fam-{{ a.family }}">{% cc_icon a.kind_icon %}<span>{{ a.title }}</span>{% if a.is_done %}{% cc_icon "check" "cc-ico cc-pill-done" %}{% endif %}</span>{% endfor %}
+          {% if day.items|length > 2 %}<span class="cc-agenda-more">+{{ day.items|length|add:"-2" }} more</span>{% endif %}
+        </span>
+        {% cc_icon "chevron_right" "cc-ico cc-agenda-go" %}
+      </a></li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+</section>
+
+{# ---------------- list ---------------- #}
+<section class="cc-view cc-view-list" aria-label="Month as a list">
+  {% for day in days %}
+  <section class="cc-day{% if day.is_today %} is-today{% endif %}" id="d-{{ day.iso }}"
+           data-cc-daygroup="{{ day.iso }}" data-label="{{ day.label }}"{% if day.is_other %} data-other{% endif %}>
+    <div class="cc-day-date" aria-hidden="true">
+      <span class="cc-day-num">{{ day.date.day }}</span>
+      <span class="cc-day-dow">{{ day.date|date:"M" }}</span>
+    </div>
+    <div class="cc-day-main">
+      <h3 class="cc-day-title">{{ day.label }}
+        <small>{{ day.items|length }} activit{{ day.items|length|pluralize:"y,ies" }}</small>
+        {% if day.is_today %}<span class="cc-today-tag">Today</span>{% endif %}</h3>
+      <div class="cc-day-cards">
+        {% for a in day.items %}{% include "client_calendar/_card.html" %}{% endfor %}
+      </div>
+    </div>
+  </section>
+  {% endfor %}
+</section>
+
+{# ---------------- day sheet ---------------- #}
+<div class="cc-scrim" data-cc-scrim data-cc-close hidden></div>
+<aside class="cc-sheet" data-cc-sheet role="dialog" aria-modal="true"
+       aria-labelledby="cc-sheet-title" tabindex="-1" hidden>
+  <div class="cc-sheet-grip" aria-hidden="true"></div>
+  <header class="cc-sheet-h" data-cc-sheet-drag>
+    <div>
+      <p class="cc-sheet-eyebrow" data-cc-sheet-count></p>
+      <h2 class="cc-sheet-title" id="cc-sheet-title" data-cc-sheet-title></h2>
+    </div>
+    <div class="cc-sheet-nav">
+      <button type="button" class="cc-icon-btn" data-cc-prev aria-label="Previous day with activities">{% cc_icon "chevron_left" %}</button>
+      <button type="button" class="cc-icon-btn" data-cc-next aria-label="Next day with activities">{% cc_icon "chevron_right" %}</button>
+      <button type="button" class="cc-icon-btn" data-cc-close aria-label="Close">{% cc_icon "close" %}</button>
+    </div>
+  </header>
+  <div class="cc-sheet-b" data-cc-sheet-body></div>
+</aside>

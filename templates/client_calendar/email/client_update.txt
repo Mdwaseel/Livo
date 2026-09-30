@@ -1,0 +1,19 @@
+{% autoescape off %}Hi {{ reviewer.first_name }},
+
+{{ count }} change{{ count|pluralize }} to your content calendar for {{ client.name }}:
+{% if waiting %}
+{{ waiting }} item{{ waiting|pluralize:" is,s are" }} waiting for your approval.{% if approvals_url %} Review: {{ approvals_url }}{% endif %}
+{% endif %}{% for section in sections %}
+{{ section.label|upper }}
+{% for item in section.items %}- {{ item.title }} ({{ item.kind_label }}{% if item.platform_label %}, {{ item.platform_label }}{% endif %}) — {% if section.kind == 'MOVED' %}was {{ item.old_date|date:"D j M" }}, now {% endif %}{{ item.date|date:"D j M" }}{% if item.time %}, {{ item.time|time:"g:i A" }}{% endif %}{% if item.link %}
+  {{ item.link }}{% endif %}
+{% endfor %}{% endfor %}{% if coming_up %}
+COMING UP THIS WEEK
+{% for activity in coming_up %}- {{ activity.date|date:"D j M" }}: {{ activity.title }}
+{% endfor %}{% endif %}{% if calendar_url %}
+Open your calendar: {{ calendar_url }}
+{% endif %}
+--
+You're getting these because {{ agency_name }} added {{ reviewer.email }} to the calendar updates for {{ client.name }}.{% if prefs_url %}
+Change how often, or unsubscribe: {{ prefs_url }}{% endif %}
+{% endautoescape %}

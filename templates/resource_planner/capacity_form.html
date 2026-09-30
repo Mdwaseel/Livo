@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block crumb %}Resource planning · Capacity{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Capacity — {{ person.get_full_name|default:person.username }}</h2>
+    <p>How many hours this person is available for, and on which days.</p>
+  </div>
+</div>
+
+<form method="post" class="card" style="max-width:640px">
+  {% csrf_token %}
+  <div class="card-b">
+    {% if is_new %}
+    <p class="hint" style="margin:0 0 16px">
+      No profile saved yet, so the agency default is shown: 8 h/day, Monday to
+      Friday. Saving turns that default into a decision.</p>
+    {% endif %}
+
+    <div class="field">
+      <label for="id_daily_hours">Hours per working day</label>
+      <input type="number" step="0.25" min="0" max="24" name="daily_hours"
+             id="id_daily_hours" value="{{ profile.daily_hours }}" required>
+      <span class="hint">The base figure everything else is derived from.</span>
+    </div>
+
+    <fieldset class="field">
+      <legend>Working days</legend>
+      <div class="day-picker">
+        {% for number, label in weekday_choices %}
+        <label class="day-opt">
+          <input type="checkbox" name="working_days" value="{{ number }}"
+                 {% if number in selected_days %}checked{% endif %}>
+          <span>{{ label }}</span>
+        </label>
+        {% endfor %}
+      </div>
+      <span class="hint">Non-working days contribute zero capacity to the planner.</span>
+    </fieldset>
+
+    <div class="row">
+      <div class="field">
+        <label for="id_weekly">Weekly hours override</label>
+        <input type="number" step="0.25" min="0" name="weekly_hours_override"
+               id="id_weekly" value="{{ profile.weekly_hours_override|default_if_none:'' }}"
+               placeholder="{{ profile.weekly_hours }}">
+        <span class="hint">Blank = daily × working days ({{ profile.weekly_hours }} h).</span>
+      </div>
+      <div class="field">
+        <label for="id_monthly">Monthly hours override</label>
+        <input type="number" step="0.25" min="0" name="monthly_hours_override"
+               id="id_monthly" value="{{ profile.monthly_hours_override|default_if_none:'' }}"
+               placeholder="{{ profile.monthly_hours }}">
+        <span class="hint">Blank = weekly × 4.345 ({{ profile.monthly_hours }} h).</span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="id_notes">Note</label>
+      <input name="notes" id="id_notes" value="{{ profile.notes }}"
+             maxlength="200" placeholder="e.g. 4-day week from March">
+    </div>
+
+    <p class="hint" style="margin:0 0 14px">
+      Overrides change the headline weekly and monthly figures only. Day-by-day
+      planning always uses the daily hours above, because that is what a
+      calendar day can actually hold.</p>
+
+    <div style="display:flex;gap:8px">
+      <button class="btn" type="submit">Save capacity</button>
+      <a class="btn ghost" href="{% url 'resource_planner:employees' %}">Cancel</a>
+    </div>
+  </div>
+</form>
+{% endblock %}

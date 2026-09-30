@@ -1,0 +1,30 @@
+{% extends "accounts/auth_base.html" %}
+
+{% block title %}Sign in{% endblock %}
+{% block subtitle %}Sign in to the agency console.{% endblock %}
+
+{% block card %}
+<form method="post" novalidate>
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ next }}">
+
+  {% if locked_message %}
+    <div class="err">{{ locked_message }}</div>
+  {% elif form.errors %}
+    <div class="err">Incorrect username or password.</div>
+  {% endif %}
+
+  <label for="{{ form.username.id_for_label }}">Username</label>
+  {{ form.username }}
+
+  <label for="{{ form.password.id_for_label }}">Password</label>
+  {{ form.password }}
+
+  <div class="auth-links">
+    <a href="{% url 'accounts:password_reset' %}">Forgot password?</a>
+  </div>
+
+  <button type="submit">Continue</button>
+  <p class="auth-foot">Next, you'll confirm a one-time code to finish signing in.</p>
+</form>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% autoescape off %}Hi {{ person.get_full_name|default:person.username }},
+
+{{ reviewer.name|default:"The client" }} from {{ client.name }} {% if approved %}approved{% else %}asked for changes on{% endif %} version {{ approval.version }} of:
+
+    {{ activity.title }}
+    {{ activity.get_kind_display }} · {{ activity.date|date:"D, d M Y" }}
+{% if approval.feedback %}
+"{{ approval.feedback }}"
+{% endif %}{% if url %}
+{{ url }}
+{% endif %}
+-- Livo OS
+{% endautoescape %}

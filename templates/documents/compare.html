@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block crumb %}<a href="{{ document.project.get_absolute_url }}">{{ document.project.name }}</a> / <a href="{{ document.get_absolute_url }}">{{ document.title }}</a> / Compare{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h2>Compare versions</h2>
+    <p>{{ document.title }} — differences from <strong>v{{ a.version_number }}</strong> to <strong>v{{ b.version_number }}</strong>.</p></div>
+  <a href="{{ document.get_absolute_url }}" class="btn ghost">Back to document</a>
+</div>
+<div class="card">
+  <div class="card-h">
+    <form method="get" class="filters">
+      <select name="a" onchange="this.form.submit()">
+        {% for v in versions %}
+          <option value="{{ v.version_number }}" {% if v == a %}selected{% endif %}>v{{ v.version_number }} — {{ v.note }}</option>
+        {% endfor %}
+      </select>
+      <span style="color:var(--ink-faint)">→</span>
+      <select name="b" onchange="this.form.submit()">
+        {% for v in versions %}
+          <option value="{{ v.version_number }}" {% if v == b %}selected{% endif %}>v{{ v.version_number }} — {{ v.note }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    <span style="font-size:11.5px;color:var(--ink-soft)">
+      <span class="tag ok">added</span> <span class="tag warn">changed</span> <span class="tag danger">removed</span>
+    </span>
+  </div>
+  <div class="diff-wrap">{{ diff_table|safe }}</div>
+</div>
+{% endblock %}

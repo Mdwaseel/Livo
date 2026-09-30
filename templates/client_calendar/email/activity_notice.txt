@@ -1,0 +1,20 @@
+{% autoescape off %}Hi {{ reviewer.first_name }},
+
+{% if kind == 'DONE' %}This is now {{ label|lower }}:{% elif kind == 'MOVED' %}We've moved this to a new date:{% elif kind == 'POSTPONED' %}We've postponed this for now:{% elif kind == 'RESUMED' %}This is back on the plan:{% elif kind == 'ADDED' %}We've added this to your content calendar:{% else %}Here's an update:{% endif %}
+
+    {{ activity.title }}
+
+What:    {{ activity.get_kind_display }}{% if activity.platform %} · {{ activity.get_platform_display }}{% endif %}
+When:    {% if move %}was {{ move.old_date|date:"D j M" }}, now {% endif %}{{ activity.date|date:"D, j M Y" }}{% if activity.time %}, {{ activity.time|time:"g:i A" }}{% endif %}
+Status:  {{ activity.client_status_label }}
+{% if note %}
+{{ note }}{% if actor %}
+— {{ actor.get_full_name|default:actor.username }}, {{ agency_name }}{% endif %}
+{% endif %}{% if activity.link %}
+{% if kind == 'DONE' %}View it{% else %}Link{% endif %}: {{ activity.link }}{% endif %}{% if calendar_url %}
+Your calendar: {{ calendar_url }}{% endif %}
+
+--
+Sent by {{ agency_name }} for {{ client.name }}.{% if prefs_url %}
+Email preferences: {{ prefs_url }}{% endif %}
+{% endautoescape %}

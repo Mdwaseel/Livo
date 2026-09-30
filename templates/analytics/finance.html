@@ -1,0 +1,45 @@
+{% extends "analytics/_base.html" %}
+
+{% block heading %}Finance analytics{% endblock %}
+{% block lede %}Revenue, collections and what's still outstanding.{% endblock %}
+
+{% block analytics %}
+<div class="stat-grid">
+  <div class="stat"><div class="bar"></div><div class="n">₹{{ metrics.revenue|floatformat:"0g" }}</div><div class="l">Revenue in range</div></div>
+  <div class="stat"><div class="bar"></div><div class="n">₹{{ metrics.outstanding|floatformat:"0g" }}</div><div class="l">Outstanding</div></div>
+  <div class="stat"><div class="bar"></div><div class="n">{{ metrics.collection_percent|floatformat:"0" }}%</div><div class="l">Collected of portfolio</div></div>
+  <div class="stat"><div class="bar"></div><div class="n">₹{{ metrics.avg_project_value|floatformat:"0g" }}</div><div class="l">Avg project value</div></div>
+  <div class="stat"><div class="bar"></div><div class="n">₹{{ metrics.avg_client_value|floatformat:"0g" }}</div><div class="l">Avg client value</div></div>
+  <div class="stat"><div class="bar"></div><div class="n">{{ metrics.payment_count }}</div><div class="l">Payments received</div></div>
+</div>
+
+<div class="chart-grid">
+  {% include "analytics/_chart_card.html" with chart_id="revenue-trend" title="Payment trend" caption="Payments received per month across the selected range." height=320 empty="No payments received in this range." %}
+  {% include "analytics/_chart_card.html" with chart_id="monthly-growth" title="Monthly growth" caption="Revenue, hours and completed tasks, each indexed to 100 at its starting month — hours climbing away from revenue is the shape to watch." height=320 empty="Not enough history yet — growth needs at least one month with figures in it." %}
+</div>
+
+<div class="card" style="margin-top:18px">
+  <div class="card-h"><h3>Month by month</h3></div>
+  {% if metrics.trend %}
+  <div class="table-wrap"><table>
+    <thead><tr><th>Month</th><th>Payments</th><th style="text-align:right">Received</th></tr></thead>
+    <tbody>
+    {% for month, amount, count in metrics.trend %}
+      <tr>
+        <td><strong>{{ month|date:"F Y" }}</strong></td>
+        <td>{{ count }}</td>
+        <td style="text-align:right">₹{{ amount|floatformat:"0g" }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+    <tfoot><tr>
+      <td><strong>Total</strong></td>
+      <td><strong>{{ metrics.payment_count }}</strong></td>
+      <td style="text-align:right"><strong>₹{{ metrics.revenue|floatformat:"0g" }}</strong></td>
+    </tr></tfoot>
+  </table></div>
+  {% else %}
+  <div class="empty"><h3>No payments in this range</h3></div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block crumb %}<a href="{% url 'core:settings' %}">Agency settings</a> / Designations{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h2>Designations</h2><p>Job titles, optionally tied to a department, with a seniority level.</p></div>
+</div>
+<div class="grid-2">
+  <div class="card" style="align-self:start">
+    <div class="card-h"><h3>All designations</h3>
+      <span class="tag gray">{{ designations|length }}</span></div>
+    {% if designations %}
+    <table class="row-edit">
+      <thead><tr>
+        <th>Title</th><th>Department</th><th class="num">Level</th><th></th>
+      </tr></thead>
+      <tbody>
+      {% for g in designations %}
+      <tr>
+        <td>
+          <form method="post" action="{% url 'accounts:designation_update' g.pk %}" id="desig-{{ g.pk }}">
+            {% csrf_token %}
+          </form>
+          <label class="sr-only" for="desig-name-{{ g.pk }}">Designation title</label>
+          <input id="desig-name-{{ g.pk }}" name="name" value="{{ g.name }}" form="desig-{{ g.pk }}">
+        </td>
+        <td>
+          <label class="sr-only" for="desig-dept-{{ g.pk }}">Department for {{ g.name }}</label>
+          <select id="desig-dept-{{ g.pk }}" name="department" form="desig-{{ g.pk }}">
+            <option value="">—</option>
+            {% for d in departments %}<option value="{{ d.pk }}" {% if g.department_id == d.pk %}selected{% endif %}>{{ d.name }}</option>{% endfor %}
+          </select>
+        </td>
+        <td class="num">
+          <label class="sr-only" for="desig-level-{{ g.pk }}">Seniority level for {{ g.name }}</label>
+          <input type="number" id="desig-level-{{ g.pk }}" name="level" form="desig-{{ g.pk }}"
+                 value="{{ g.level }}" min="1" class="w-narrow">
+        </td>
+        <td class="row-actions">
+          <button type="submit" form="desig-{{ g.pk }}" class="link-act">Save</button>
+          <button type="submit" form="desig-{{ g.pk }}" name="delete" value="1" class="link-danger"
+                  onclick="return confirm('Delete designation “{{ g.name|escapejs }}”?')">Delete</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody></table>
+    {% else %}
+    <div class="empty"><h3>No designations yet</h3><p>Add one on the right.</p></div>
+    {% endif %}
+  </div>
+  <div class="card" style="align-self:start">
+    <div class="card-h"><h3>New designation</h3></div>
+    <div class="card-b">
+      <form method="post">
+        {% csrf_token %}
+        <div class="field"><label>Title *</label><input name="name" required placeholder="e.g. Senior Developer"></div>
+        <div class="field"><label>Department</label>
+          <select name="department"><option value="">—</option>
+            {% for d in departments %}<option value="{{ d.pk }}">{{ d.name }}</option>{% endfor %}
+          </select></div>
+        <div class="field"><label>Level (higher = senior)</label><input type="number" name="level" value="1" min="1"></div>
+        <button class="btn" type="submit">Add designation</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

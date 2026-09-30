@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block crumb %}<a href="{% url 'core:settings' %}">Agency settings</a> / Departments{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h2>Departments</h2><p>Org units your team and designations hang off.</p></div>
+</div>
+<div class="grid-2">
+  <div class="card" style="align-self:start">
+    <div class="card-h"><h3>All departments</h3>
+      <span class="tag gray">{{ departments|length }}</span></div>
+    {% if departments %}
+    <table class="row-edit">
+      <thead><tr>
+        <th>Department</th><th>Head</th><th class="num">Members</th><th></th>
+      </tr></thead>
+      <tbody>
+      {% for d in departments %}
+      <tr>
+        <td>
+          <form method="post" action="{% url 'accounts:department_update' d.pk %}" id="dept-{{ d.pk }}">
+            {% csrf_token %}
+          </form>
+          <label class="sr-only" for="dept-name-{{ d.pk }}">Department name</label>
+          <input id="dept-name-{{ d.pk }}" name="name" value="{{ d.name }}" form="dept-{{ d.pk }}">
+        </td>
+        <td>
+          <label class="sr-only" for="dept-head-{{ d.pk }}">Head of {{ d.name }}</label>
+          <select id="dept-head-{{ d.pk }}" name="head" form="dept-{{ d.pk }}">
+            <option value="">—</option>
+            {% for u in users %}<option value="{{ u.pk }}" {% if d.head_id == u.pk %}selected{% endif %}>{{ u.get_full_name|default:u.username }}</option>{% endfor %}
+          </select>
+        </td>
+        <td class="num"><span class="tag gray">{{ d.members_count }}</span></td>
+        <td class="row-actions">
+          <button type="submit" form="dept-{{ d.pk }}" class="link-act">Save</button>
+          <button type="submit" form="dept-{{ d.pk }}" name="delete" value="1" class="link-danger"
+                  onclick="return confirm('Delete department “{{ d.name|escapejs }}”? Members keep their accounts.')">Delete</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody></table>
+    {% else %}
+    <div class="empty"><h3>No departments yet</h3><p>Add one on the right.</p></div>
+    {% endif %}
+  </div>
+  <div class="card" style="align-self:start">
+    <div class="card-h"><h3>New department</h3></div>
+    <div class="card-b">
+      <form method="post">
+        {% csrf_token %}
+        <div class="field"><label>Name *</label><input name="name" required placeholder="e.g. Delivery"></div>
+        <div class="field"><label>Head</label>
+          <select name="head"><option value="">—</option>
+            {% for u in users %}<option value="{{ u.pk }}">{{ u.get_full_name|default:u.username }}</option>{% endfor %}
+          </select></div>
+        <div class="field"><label>Description</label><textarea name="description"></textarea></div>
+        <button class="btn" type="submit">Add department</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

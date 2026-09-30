@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% load static client_calendar_tags %}
+{% block title %}{{ activity.title }} · Approval · Livo OS{% endblock %}
+{% block head %}<link rel="stylesheet" href="{% static 'css/client_calendar.css' %}"><link rel="stylesheet" href="{% static 'css/client_review.css' %}">{% endblock %}
+{% block crumb %}<a href="{% url 'client_calendar:index' %}">Client calendars</a> / <a href="{% url 'client_calendar:approvals' %}">Approvals</a> / {{ activity.title|truncatechars:40 }}{% endblock %}
+
+{% block content %}
+<div class="cc ap-page">
+<div class="page-head">
+  <div>
+    <h2>{{ activity.title }} <span class="ap-v">v{{ approval.version }}</span></h2>
+    <p>{{ client.name }} · {{ activity.get_kind_display }}{% if activity.platform %} · {{ activity.get_platform_display }}{% endif %} · planned {{ activity.date|date:"D j M Y" }} ·
+      <a href="{% url 'client_calendar:planner' client.pk %}?date={{ activity.date|date:'Y-m-d' }}#d-{{ activity.date|date:'Y-m-d' }}" style="color:var(--primary);font-weight:600">See it on the calendar</a></p>
+  </div>
+  {% if can_plan %}
+  <div class="page-actions">
+    {% if approval.is_pending %}
+    <form method="post" action="{% url 'client_calendar:approval_remind' approval.pk %}">
+      {% csrf_token %}<button class="btn ghost" type="submit">{% cc_icon "email" "" %}<span>Send reminder</span></button>
+    </form>
+    {% endif %}
+    {% if latest.pk == approval.pk and approval.status != "APPROVED" %}
+    <a class="btn" href="{% url 'client_calendar:approval_create' activity.pk %}">{% cc_icon "send" "" %}<span>{% if approval.status == "CHANGES" %}Send revised version{% else %}Send a new version{% endif %}</span></a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% if latest.pk != approval.pk %}
+<div class="ap-note-bar">You're looking at version {{ approval.version }}. <a href="{{ latest.get_absolute_url }}">Version {{ latest.version }} is the latest &rarr;</a></div>
+{% endif %}
+
+<section class="ap-banner is-{{ approval.status|lower }}">
+  <span class="ap-banner-ico" aria-hidden="true">{% if approval.status == "APPROVED" %}{% cc_icon "badge_check" %}{% elif approval.status == "CHANGES" %}{% cc_icon "message" %}{% elif approval.is_pending %}{% cc_icon "clock" %}{% else %}{% cc_icon "undo" %}{% endif %}</span>
+  <div class="ap-banner-main">
+    {% if approval.is_pending %}
+      <h3>Waiting for {{ client.name }}</h3>
+      <p>Sent {{ approval.created_at|cc_ago }}{% if approval.created_by %} by {{ approval.created_by.get_full_name|default:approval.created_by.username }}{% endif %}{% if approval.respond_by %} · {% if approval.is_overdue %}<strong>overdue since {{ approval.respond_by|date:"j M" }}</strong>{% else %}reply requested by {{ approval.respond_by|date:"D j M" }}{% endif %}{% endif %}.</p>
+    {% elif approval.status == "APPROVED" %}
+      <h3>Approved by {{ approval.decided_by.name|default:"the client" }}</h3>
+      <p>{{ approval.decided_at|date:"D j M Y, g:i A" }}. The activity now shows “Approved by client” — mark it Done once it's live.</p>
+    {% elif approval.status == "CHANGES" %}
+      <h3>{{ approval.decided_by.name|default:"The client" }} asked for changes</h3>
+      <p>{{ approval.decided_at|date:"D j M Y, g:i A" }}{% if latest.pk == approval.pk %}. Make the changes, then send the revised version.{% endif %}</p>
+    {% else %}
+      <h3>Withdrawn</h3>
+      <p>No longer waiting on the client.</p>
+    {% endif %}
+    {% if approval.feedback %}<blockquote class="ap-quote">{{ approval.feedback|linebreaksbr }}</blockquote>{% endif %}
+  </div>
+  {% if approval.is_pending and can_plan %}
+  <form method="post" action="{% url 'client_calendar:approval_withdraw' approval.pk %}"
+        onsubmit="return confirm('Withdraw this request? The link in the client email will say it no longer needs them.')">
+    {% csrf_token %}<button class="link-act muted" type="submit">Withdraw</button>
+  </form>
+  {% endif %}
+</section>
+
+<div class="ap-detail">
+  <div class="ap-detail-main">
+    {% if approval.message %}
+    <section class="card">
+      <div class="card-h"><h3>Note sent to the client</h3></div>
+      <div class="card-b ap-prose">{{ approval.message|linebreaks }}</div>
+    </section>
+    {% endif %}
+    {% if approval.content %}
+    <section class="card">
+      <div class="card-h"><h3>Copy to approve</h3></div>
+      <div class="card-b ap-prose">{{ approval.content|linebreaks }}</div>
+    </section>
+    {% endif %}
+    {% if assets %}
+    <section class="card">
+      <div class="card-h"><h3>Files &amp; links · {{ assets|length }}</h3></div>
+      <div class="card-b ap-assets">
+        {% for asset in assets %}
+        {% if asset.is_image %}
+        <a class="ap-asset-img" href="{{ asset.file.url }}" target="_blank" rel="noopener">
+          <img src="{{ asset.file.url }}" alt="{{ asset.display_name }}" loading="lazy"><span>{{ asset.display_name }}</span></a>
+        {% else %}
+        <a class="ap-asset-file" href="{% if asset.is_link %}{{ asset.url }}{% else %}{{ asset.file.url }}{% endif %}" target="_blank" rel="noopener noreferrer">
+          <span class="ap-asset-ico" aria-hidden="true">{% cc_icon asset.icon %}</span>
+          <span class="ap-asset-main"><strong>{{ asset.display_name }}</strong>
+            <small>{% if asset.is_link %}{{ asset.host }}{% else %}{{ asset.extension|upper }}{% if asset.size_label %} · {{ asset.size_label }}{% endif %}{% endif %}</small></span>
+          {% cc_icon "external" %}
+        </a>
+        {% endif %}
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+    {% if not approval.message and not approval.content and not assets %}
+    <section class="card"><div class="empty"><h3>Nothing attached</h3><p>This version was sent without copy, files or links.</p></div></section>
+    {% endif %}
+  </div>
+
+  <aside class="ap-detail-side">
+    <section class="card">
+      <div class="card-h"><h3>Sent to</h3></div>
+      <ul class="ap-recipients">
+        {% for r in recipients %}
+        <li>
+          <span class="ap-avatar" aria-hidden="true">{{ r.reviewer.name|slice:":1"|upper }}</span>
+          <div class="ap-rec-main">
+            <strong>{{ r.reviewer.name }}</strong>
+            <small>{{ r.reviewer.email }}</small>
+            <small class="ap-rec-state">
+              {% if not r.reviewer.is_active %}<span class="tag danger">Access removed</span>
+              {% elif r.first_opened_at %}{% cc_icon "check" %}Opened {{ r.last_opened_at|cc_ago }}
+              {% elif r.last_emailed_at %}Emailed {{ r.last_emailed_at|cc_ago }} · not opened yet
+              {% else %}<span class="tag danger">Email not sent</span>{% endif %}
+            </small>
+            {% if can_plan %}
+            <div class="ap-rec-actions">
+              {% if approval.is_pending and r.reviewer.is_active %}
+              <form method="post" action="{% url 'client_calendar:approval_remind' approval.pk %}">
+                {% csrf_token %}<input type="hidden" name="reviewer" value="{{ r.reviewer.pk }}">
+                <button type="submit" class="link-act">Resend</button>
+              </form>
+              {% endif %}
+              {% if r.reviewer.is_active %}
+              <form method="post" action="{% url 'client_calendar:reviewer_access' r.reviewer.pk %}"
+                    onsubmit="return confirm('Sign {{ r.reviewer.name|escapejs }} out of every device? They will need a new emailed code.')">
+                {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><input type="hidden" name="action" value="signout">
+                <button type="submit" class="link-act muted">Sign out devices</button>
+              </form>
+              <form method="post" action="{% url 'client_calendar:reviewer_access' r.reviewer.pk %}"
+                    onsubmit="return confirm('Remove {{ r.reviewer.name|escapejs }}’s access to all approvals for {{ client.name|escapejs }}?')">
+                {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><input type="hidden" name="action" value="revoke">
+                <button type="submit" class="link-danger" style="margin:0">Remove access</button>
+              </form>
+              {% endif %}
+            </div>
+            {% endif %}
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+
+    <section class="card">
+      <div class="card-h"><h3>History</h3></div>
+      <ol class="rv-timeline ap-timeline">
+        {% for event in history %}
+        <li class="rv-ev is-{{ event.kind|lower }}">
+          <span class="rv-ev-dot" aria-hidden="true"></span>
+          <div>
+            <p><strong>{{ event.get_kind_display }}</strong>{% if event.who %} · {{ event.who }}{% endif %}</p>
+            {% if event.note and event.kind != "APPROVED" and event.kind != "CHANGES" %}<p class="rv-ev-note">{{ event.note }}</p>{% endif %}
+            <time datetime="{{ event.created_at|date:'c' }}">{{ event.created_at|date:"j M, g:i A" }}</time>
+          </div>
+        </li>
+        {% endfor %}
+      </ol>
+    </section>
+
+    {% if versions|length > 1 %}
+    <section class="card">
+      <div class="card-h"><h3>All versions</h3></div>
+      <ul class="ap-versions">
+        {% for version in versions %}
+        <li{% if version.pk == approval.pk %} class="is-current"{% endif %}>
+          <a href="{{ version.get_absolute_url }}"{% if version.pk == approval.pk %} aria-current="page"{% endif %}>Version {{ version.version }}</a>
+          <span class="tag {{ version.tone }}">{{ version.get_status_display }}</span>
+          <small>{{ version.created_at|date:"j M" }}</small>
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+  </aside>
+</div>
+</div>
+{% endblock %}

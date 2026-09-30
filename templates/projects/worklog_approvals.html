@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Work logs to approve · Livo OS{% endblock %}
+{% block crumb %}<a href="{% url 'worklogs:mine' %}">My work logs</a> / To approve{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h2>Work logs to approve</h2>
+    <p>Time submitted by the people who report to you.</p>
+  </div>
+  <a href="{% url 'worklogs:mine' %}" class="btn ghost">My timesheet</a>
+</div>
+
+{% for group in groups %}
+<div class="card" style="margin-top:18px">
+  <div class="card-h">
+    <h3>{% if group.person %}{{ group.person.get_full_name|default:group.person.username }}{% else %}Unattributed{% endif %}</h3>
+    <span style="display:flex;gap:6px">
+      <span class="tag gray">{{ group.entries|length }} entr{{ group.entries|length|pluralize:"y,ies" }}</span>
+      <span class="tag info">{{ group.total|floatformat:"-2" }} h</span>
+    </span>
+  </div>
+  <div class="table-wrap">
+  <table class="ts-table">
+    <tbody>
+    {% for w in group.entries %}
+      <tr>
+        <td class="ts-when">{{ w.date|date:"D d M" }}</td>
+        <td class="ts-what">
+          <strong>{{ w.description }}</strong>
+          <div class="ts-sub">
+            <a href="{{ w.project.get_absolute_url }}">{{ w.project.name }}</a>
+            {% if w.task %} · <a href="{{ w.task.get_absolute_url }}">{{ w.task.title }}</a>{% endif %}
+            · {{ w.get_category_display }}
+            {% if w.start_time and w.end_time %} · {{ w.start_time|time:"H:i" }}–{{ w.end_time|time:"H:i" }}{% endif %}
+          </div>
+        </td>
+        <td class="ts-hours">{{ w.hours|floatformat:"-2" }} h</td>
+        <td class="ts-billable">
+          {% if w.is_billable %}<span class="tag ok">Billable</span>
+          {% else %}<span class="tag gray">Non-billable</span>{% endif %}</td>
+        <td class="ts-status">
+          {% if w.screenshot %}
+          <a href="{{ w.screenshot.url }}" target="_blank" rel="noopener"
+             class="ts-shot" title="View screenshot" aria-label="View screenshot for {{ w.date|date:'d M' }}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          </a>
+          {% endif %}
+        </td>
+        <td class="ts-review">
+          <form method="post" action="{% url 'projects:worklog_approve' w.pk %}">
+            {% csrf_token %}
+            <button class="btn sm" type="submit">Approve</button>
+          </form>
+          <form method="post" action="{% url 'projects:worklog_reject' w.pk %}" class="reject-form">
+            {% csrf_token %}
+            <label class="sr-only" for="note-{{ w.pk }}">Reason for rejecting</label>
+            <input name="note" id="note-{{ w.pk }}" placeholder="Reason…" required>
+            <button class="btn ghost sm" type="submit">Reject</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% empty %}
+<div class="card" style="margin-top:18px"><div class="card-b">
+  <div class="empty-state">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    <p><strong>Nothing waiting on you.</strong></p>
+    <p>Submitted work logs appear here for approval.</p>
+  </div>
+</div></div>
+{% endfor %}
+
+{% endblock %}

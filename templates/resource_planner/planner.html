@@ -1,0 +1,252 @@
+{% extends "resource_planner/_base.html" %}
+
+{% block heading %}{% if planner_mode == 'month' %}Monthly planner{% else %}Weekly planner{% endif %}{% endblock %}
+{% block lede %}Drag a task onto another person or another day to reassign it.{% endblock %}
+
+{% block planner %}
+<div class="stat-grid">
+  <div class="stat"><div class="bar"></div><div class="n">{{ summary.capacity|floatformat:"0" }}</div><div class="l">Capacity (h)</div></div>
+  <div class="stat"><div class="bar"></div><div class="n">{{ summary.allocated|floatformat:"0" }}</div><div class="l">Allocated (h)</div></div>
+  <div class="stat{% if summary.remaining < 0 %} tone-danger{% endif %}"><div class="bar"></div>
+    <div class="n">{{ summary.remaining|floatformat:"0" }}</div><div class="l">Remaining (h)</div></div>
+  <div class="stat"><div class="bar"></div><div class="n">{{ summary.utilization_percent|floatformat:"0" }}%</div><div class="l">Utilisation</div></div>
+</div>
+
+<div class="card">
+  <div class="card-h">
+    <h3>{% if planner_mode == 'month' %}{{ window.start|date:"F Y" }}{% else %}{{ window.start|date:"d M" }} &ndash; {{ window.end|date:"d M Y" }}{% endif %}</h3>
+    <div class="heat-legend" aria-hidden="true">
+      <span>Idle</span>
+      <i class="heat heat-0"></i><i class="heat heat-1"></i><i class="heat heat-2"></i>
+      <i class="heat heat-3"></i><i class="heat heat-4"></i>
+      <span>Over</span>
+    </div>
+  </div>
+  <div class="card-b" style="padding:0">
+    {% if grid.rows %}
+    <div class="planner-scroll">
+      <table class="planner{% if planner_mode == 'month' %} planner-month{% endif %}">
+        <caption class="visually-hidden">
+          Workload heatmap: one row per person, one column per day. Each cell
+          shows allocated hours against that day's capacity.
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col" class="pl-name">Person</th>
+            {% for day in grid.days %}
+            <th scope="col" class="pl-day{% if day == today %} today{% endif %}">
+              <span class="pl-dow">{{ day|date:"D" }}</span>
+              <span class="pl-dom">{{ day|date:"j" }}</span>
+            </th>
+            {% endfor %}
+            <th scope="col" class="pl-total">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in grid.rows %}
+          <tr>
+            <th scope="row" class="pl-name">
+              <strong>{{ row.user.get_full_name|default:row.user.username }}</strong>
+              <span class="cell-sub">{{ row.department.name|default:"—" }}</span>
+            </th>
+            {% for cell in row.cells %}
+            <td class="pl-cell heat-{{ cell.heat }}{% if not cell.is_working_day %} non-working{% endif %}{% if cell.is_today %} today{% endif %}"
+                data-user="{{ row.user.pk }}" data-date="{{ cell.date|date:'Y-m-d' }}"
+                {% if can_assign %}data-drop="1"{% endif %}
+                title="{{ row.user.get_full_name|default:row.user.username }} · {{ cell.date|date:'D d M' }}: {{ cell.allocated|floatformat:'-2' }} h of {{ cell.capacity|floatformat:'-2' }} h{% if cell.leave %} · {{ cell.leave.kind|title }} leave{% endif %}">
+              {% if cell.leave %}
+                <span class="pl-leave" aria-label="On leave">{% if cell.leave.fraction < 1 %}½{% else %}&#9679;{% endif %}</span>
+              {% elif not cell.is_working_day %}
+                <span class="pl-off" aria-label="Not a working day">&middot;</span>
+              {% else %}
+                <span class="pl-hours">{{ cell.allocated|floatformat:"-2" }}</span>
+                <span class="pl-cap">/{{ cell.capacity|floatformat:"-2" }}</span>
+              {% endif %}
+              {% if cell.pending_leave %}<span class="pl-pending" title="Leave requested, not yet approved">?</span>{% endif %}
+              {% if cell.tasks %}
+              <div class="pl-tasks">
+                {% for t in cell.tasks %}
+                <a class="chip prio-{{ t.priority|lower }}" href="{{ t.get_absolute_url }}"
+                   {% if can_assign %}draggable="true" data-task="{{ t.pk }}"
+                   data-hours="{{ t.estimated_hours|default_if_none:0 }}"{% endif %}
+                   title="{{ t.title }} · {{ t.project.name }}{% if t.estimated_hours %} · {{ t.estimated_hours }} h{% else %} · no estimate{% endif %}">
+                  {{ t.title|truncatechars:22 }}</a>
+                {% endfor %}
+              </div>
+              {% endif %}
+            </td>
+            {% endfor %}
+            <td class="pl-total">
+              <span class="pill pill-{{ row.status }}">{{ row.utilization_percent|floatformat:"0" }}%</span>
+              <span class="cell-sub">{{ row.allocated|floatformat:"-2" }}/{{ row.capacity|floatformat:"-2" }} h</span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr>
+            <th scope="row" class="pl-name">Team</th>
+            {% for total in grid.totals %}
+            <td class="pl-cell pl-foot">
+              <span class="pl-hours">{{ total.allocated|floatformat:"-2" }}</span>
+              <span class="pl-cap">/{{ total.capacity|floatformat:"-2" }}</span>
+              <span class="pl-pct u-{{ total.status }}">{{ total.utilization_percent|floatformat:"0" }}%</span>
+            </td>
+            {% endfor %}
+            <td class="pl-total"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty"><h3>Nobody to plan</h3>
+      <p>No active employees match these filters.</p></div>
+    {% endif %}
+  </div>
+</div>
+
+{% if unassigned %}
+<div class="card" style="margin-top:18px">
+  <div class="card-h"><h3>Unassigned backlog</h3><span class="tag warn">{{ unassigned|length }}</span></div>
+  <div class="card-b">
+    <p class="hint" style="margin:0 0 10px">
+      {% if can_assign %}Drag any of these onto a person and day above to schedule it.
+      {% else %}Open tasks with nobody assigned.{% endif %}</p>
+    <div class="backlog" {% if can_assign %}data-drop="1" data-user="" data-date=""{% endif %}>
+      {% for t in unassigned %}
+      <a class="chip prio-{{ t.priority|lower }}" href="{{ t.get_absolute_url }}"
+         {% if can_assign %}draggable="true" data-task="{{ t.pk }}"
+         data-hours="{{ t.estimated_hours|default_if_none:0 }}"{% endif %}
+         title="{{ t.title }} · {{ t.project.name }}{% if t.due_date %} · due {{ t.due_date|date:'d M' }}{% endif %}">
+        {{ t.title|truncatechars:28 }}
+        <span class="chip-meta">{{ t.project.name|truncatechars:14 }}</span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if can_assign %}
+{% comment %}
+The only form on this page is the GET filter bar, which renders no CSRF token —
+so the fetch() below would have no token to send. This hidden form emits one and
+sets the cookie.
+{% endcomment %}
+<form id="planner-csrf" hidden>{% csrf_token %}</form>
+<div class="drop-toast" id="planner-toast" role="status" aria-live="polite" hidden></div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if can_assign %}
+<script>
+// Drag-and-drop reassignment.
+//
+// Native HTML5 DnD rather than a library: the whole interaction is "pick up a
+// chip, drop it on a cell", and pulling in a drag library for that would be a
+// bigger dependency than the feature. Chips stay real <a> links, so keyboard
+// users and anyone without a pointer can still open the task and reassign it on
+// its own page — dragging is an accelerator, not the only route.
+(function () {
+  var endpoint = "{% url 'resource_planner:reassign' %}";
+  var csrf = document.querySelector('input[name="csrfmiddlewaretoken"]');
+  var toast = document.getElementById("planner-toast");
+  var dragged = null;
+
+  function token() {
+    if (csrf) return csrf.value;
+    var match = document.cookie.match(/(^|;\s*)csrftoken=([^;]*)/);
+    return match ? decodeURIComponent(match[2]) : "";
+  }
+
+  function say(message, tone) {
+    if (!toast) return;
+    toast.textContent = message;
+    toast.className = "drop-toast on " + (tone || "");
+    toast.hidden = false;
+    clearTimeout(toast._timer);
+    // Long enough to read an overbooking warning, which is the longest thing
+    // this ever says.
+    toast._timer = setTimeout(function () { toast.hidden = true; }, 6000);
+  }
+
+  document.addEventListener("dragstart", function (event) {
+    var chip = event.target.closest("[data-task]");
+    if (!chip) return;
+    dragged = chip;
+    chip.classList.add("dragging");
+    event.dataTransfer.effectAllowed = "move";
+    // Firefox ignores the drag unless something is written to the transfer.
+    event.dataTransfer.setData("text/plain", chip.dataset.task);
+  });
+
+  document.addEventListener("dragend", function () {
+    if (dragged) dragged.classList.remove("dragging");
+    document.querySelectorAll(".drop-target").forEach(function (node) {
+      node.classList.remove("drop-target");
+    });
+    dragged = null;
+  });
+
+  document.addEventListener("dragover", function (event) {
+    var zone = event.target.closest("[data-drop]");
+    if (!zone || !dragged) return;
+    event.preventDefault();  // without this the browser refuses the drop
+    event.dataTransfer.dropEffect = "move";
+    zone.classList.add("drop-target");
+  });
+
+  document.addEventListener("dragleave", function (event) {
+    var zone = event.target.closest("[data-drop]");
+    if (zone) zone.classList.remove("drop-target");
+  });
+
+  document.addEventListener("drop", function (event) {
+    var zone = event.target.closest("[data-drop]");
+    if (!zone || !dragged) return;
+    event.preventDefault();
+    zone.classList.remove("drop-target");
+
+    var chip = dragged;
+    var payload = {task: chip.dataset.task, assignee: zone.dataset.user || null};
+    if (zone.dataset.date) payload.due_date = zone.dataset.date;
+
+    zone.classList.add("saving");
+    fetch(endpoint, {
+      method: "POST",
+      headers: {"Content-Type": "application/json", "X-CSRFToken": token()},
+      credentials: "same-origin",
+      body: JSON.stringify(payload)
+    }).then(function (response) {
+      return response.json().then(function (data) {
+        return {ok: response.ok, data: data};
+      });
+    }).then(function (result) {
+      zone.classList.remove("saving");
+      if (!result.ok || !result.data.ok) {
+        say(result.data.error || "That move didn't save.", "bad");
+        return;
+      }
+      if (result.data.unchanged) { say("Already there."); return; }
+      // Move the chip optimistically, then reload so every dependent figure —
+      // the person's total, the day column, the agency headline — is recomputed
+      // by the server rather than guessed at in the browser.
+      if (zone.querySelector(".pl-tasks")) {
+        zone.querySelector(".pl-tasks").appendChild(chip);
+      } else {
+        zone.appendChild(chip);
+      }
+      say(result.data.warning || "Task reassigned. Refreshing…",
+          result.data.warning ? "warn" : "");
+      setTimeout(function () { window.location.reload(); },
+                 result.data.warning ? 2500 : 700);
+    }).catch(function () {
+      zone.classList.remove("saving");
+      say("Couldn't reach the server.", "bad");
+    });
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

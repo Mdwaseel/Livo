@@ -1,0 +1,15 @@
+Django>=5.2,<6.0
+dj-database-url>=2.1
+python-dotenv>=1.0
+Pillow>=10
+xhtml2pdf>=0.2.16
+# Serves /static/ from the Django process itself — required on Vercel, where
+# there is no nginx in front; harmless behind nginx on the VPS.
+whitenoise>=6.7
+# PostgreSQL driver, used whenever DATABASE_URL points at Postgres (Vercel/Neon,
+# or the VPS). psycopg 3 ships binary wheels for current Pythons incl. 3.14.
+psycopg[binary]>=3.2
+# AI (Groq Cloud with key rotation) uses stdlib urllib — no SDK needed.
+# Better PDF engine on Linux servers (needs GTK native libs; auto-detected).
+# Not available on Vercel — the xhtml2pdf fallback is used there:
+# weasyprint>=62

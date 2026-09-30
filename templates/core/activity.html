@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block crumb %}Activity log{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h2>Activity log</h2><p>Who did what, across the whole workspace.</p></div>
+</div>
+<div class="card">
+  {% if page.object_list %}
+  <div class="table-wrap"><table><thead><tr><th>When</th><th>Who</th><th>Action</th><th>Target</th></tr></thead><tbody>
+  {% for e in page.object_list %}
+    <tr><td style="color:var(--ink-soft);white-space:nowrap">{{ e.created_at|date:"d M Y, H:i" }}</td>
+    <td><strong>{{ e.user|default:"—" }}</strong></td>
+    <td>{{ e.verb }}</td>
+    <td>{{ e.target|default:"—" }}</td></tr>
+  {% endfor %}</tbody></table></div>
+  {% if page.paginator.num_pages > 1 %}
+  <div class="pager">
+    {% if page.has_previous %}<a href="?page={{ page.previous_page_number }}">← Newer</a>{% endif %}
+    <span>Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}<a href="?page={{ page.next_page_number }}">Older →</a>{% endif %}
+  </div>
+  {% endif %}
+  {% else %}
+  <div class="empty"><h3>No activity yet</h3><p>Actions across the console will appear here.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

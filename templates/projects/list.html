@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% load rbac_tags %}
+{% block crumb %}Projects{% endblock %}
+{% block content %}
+{% user_can user 'projects' 'create' as can_add_project %}
+{% user_can user 'projects' 'delete' as can_del_project %}
+<div class="page-head">
+  <div><h2>Projects</h2><p>Browse by client — expand a client to see its engagements.</p></div>
+  {% if can_add_project %}
+  <a href="{% url 'projects:create_standalone' %}" class="btn">+ New project</a>
+  {% endif %}
+</div>
+
+<form method="get" class="filters" style="margin-bottom:16px">
+  <div class="search">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input name="q" value="{{ q }}" placeholder="Search clients or projects…">
+  </div>
+  {% if q %}<a href="{% url 'projects:list' %}" class="btn ghost sm">Clear</a>{% endif %}
+</form>
+
+{% if can_del_project %}
+<form id="bulk-projects" data-bulk method="post" action="{% url 'projects:bulk_delete' %}"
+      onsubmit="return confirm('Delete the selected projects? Their documents will be deleted too. This cannot be undone.')">
+  {% csrf_token %}
+</form>
+<div class="bulk-bar" data-bulk-bar="bulk-projects" hidden>
+  <span class="count">0 selected</span>
+  <button class="btn sm danger" type="submit" form="bulk-projects">Delete selected</button>
+</div>
+{% endif %}
+
+{% for c in clients %}
+<div class="acc{% if q or forloop.counter <= 3 %} open{% endif %}">
+  <button type="button" class="acc-h" aria-expanded="{% if q or forloop.counter <= 3 %}true{% else %}false{% endif %}" aria-controls="acc-body-{{ c.pk }}">
+    <svg class="acc-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+    <span class="acc-name">{{ c.name }}</span>
+    <span class="acc-meta">
+      <span class="tag {% if c.active_count %}ok{% else %}gray{% endif %}">{{ c.active_count }} active</span>
+      {% if can_view_finance %}
+      {% if c.fin_outstanding > 0 %}
+      <span class="tag warn" title="Outstanding balance">₹{{ c.fin_outstanding|floatformat:"0g" }} due</span>
+      {% elif c.fin_outstanding < 0 %}
+      <span class="tag info" title="Outstanding balance">Overpaid</span>
+      {% elif c.fin_value %}
+      <span class="tag ok" title="Outstanding balance">Settled</span>
+      {% else %}
+      <span class="tag gray" title="Outstanding balance">Balance —</span>
+      {% endif %}
+      {% endif %}
+    </span>
+  </button>
+  <div class="acc-b" id="acc-body-{{ c.pk }}">
+    <div class="acc-inner">
+      {% if c.visible_projects %}
+      <div class="table-wrap">
+      <table>
+        <thead><tr>
+          {% if can_del_project %}<th class="chk"></th>{% endif %}
+          <th>Project</th><th>Type</th><th>Status</th><th>Setup</th><th>Documents</th>
+          {% if can.delivery %}<th></th>{% endif %}
+        </tr></thead>
+        <tbody>
+        {% for p in c.visible_projects %}
+          <tr>
+            {% if can_del_project %}
+            <td class="chk"><input type="checkbox" name="selected" value="{{ p.pk }}" form="bulk-projects" aria-label="Select {{ p.name }}"></td>
+            {% endif %}
+            <td><a href="{{ p.get_absolute_url }}"><strong>{{ p.name }}</strong></a>
+              {% if p.is_default %} <span class="tag gray">default</span>{% endif %}</td>
+            <td style="color:var(--ink-soft)">{{ p.project_type|default:"—" }}</td>
+            <td><span class="tag {% if p.status == 'ACTIVE' %}ok{% elif p.status == 'ON_HOLD' %}warn{% elif p.status == 'CANCELLED' %}danger{% else %}gray{% endif %}">{{ p.get_status_display }}</span></td>
+            <td>{% with ob=p.onboarding_progress %}{% if ob.total %}<span class="tag {% if ob.done == ob.total %}ok{% else %}gray{% endif %}" title="Onboarding progress">{{ ob.done }}/{{ ob.total }}</span>{% else %}—{% endif %}{% endwith %}</td>
+            <td><span class="tag gray">{{ p.doc_count }}</span></td>
+            {% if can.delivery %}
+            <td class="row-actions">
+              <a href="{% url 'projects:edit' p.pk %}">Edit</a>
+              {% if can_del_project %}
+              <form method="post" action="{% url 'projects:delete' p.pk %}" style="display:inline"
+                    onsubmit="return confirm('Delete “{{ p.name|escapejs }}”? Its documents will be deleted too. This cannot be undone.')">
+                {% csrf_token %}<button type="submit" class="link-danger">Delete</button>
+              </form>
+              {% endif %}
+            </td>
+            {% endif %}
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      {% else %}
+      <div class="empty" style="padding:24px 20px"><h3>No projects yet</h3>
+        <p>Start this client's first engagement.</p></div>
+      {% endif %}
+      <div class="acc-foot">
+        <a href="{{ c.get_absolute_url }}">View client →</a>
+        {% if can_add_project %}
+        <a href="{% url 'projects:create' c.pk %}">+ New project for {{ c.name }}</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% empty %}
+<div class="card"><div class="empty"><h3>No clients found</h3>
+  <p>{% if q %}Try clearing the search.{% else %}Add a client to get started.{% endif %}</p></div></div>
+{% endfor %}
+
+<script>
+document.querySelectorAll(".acc-h").forEach(function (btn) {
+  btn.addEventListener("click", function () {
+    var acc = btn.closest(".acc");
+    var open = acc.classList.toggle("open");
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+});
+</script>
+{% include "_bulk_select.html" %}
+{% endblock %}

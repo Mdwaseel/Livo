@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% load static client_calendar_tags %}
+{% block title %}Client calendars · Livo OS{% endblock %}
+{% block head %}<link rel="stylesheet" href="{% static 'css/client_calendar.css' %}">{% endblock %}
+{% block crumb %}Client calendars{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Client calendars</h2>
+    <p>Plan each client's posts, stories, ad changes and reports, then share a private link so they can follow along.
+      {% if rows %}{{ shared }} of {{ rows|length }} shared.{% endif %}</p>
+  </div>
+  <div class="page-actions">
+    <a class="btn ghost" href="{% url 'client_calendar:approvals' %}">{% cc_icon "badge_check" "" %}<span>Client approvals{% if approvals_waiting %} · {{ approvals_waiting }} waiting{% endif %}</span></a>
+  </div>
+</div>
+
+{% if rows %}
+<div class="cc-index">
+  {% for row in rows %}
+  <a class="cc-index-card" href="{% url 'client_calendar:planner' row.client.pk %}">
+    <div class="cc-index-top">
+      <h3>{{ row.client.name }}</h3>
+      {% if row.link and row.link.is_active %}<span class="tag ok"><span class="dot"></span>Shared</span>
+      {% elif row.link %}<span class="tag gray">Link off</span>
+      {% else %}<span class="tag gray">Not shared</span>{% endif %}
+    </div>
+    <div class="cc-index-stats">
+      <div><b>{{ row.stats.total|default:0 }}</b><span>Planned</span></div>
+      <div><b>{{ row.stats.done|default:0 }}</b><span>Delivered</span></div>
+      <div{% if row.stats.approval %} class="is-hot"{% endif %}><b>{{ row.stats.approval|default:0 }}</b><span>Awaiting approval</span></div>
+    </div>
+    <div class="cc-index-foot">
+      <span>{{ month|date:"F Y" }}{% if row.link and row.link.view_count %} · opened {{ row.link.view_count }}×{% endif %}</span>
+      <strong>Open planner &rarr;</strong>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card"><div class="empty">
+  <h3>No clients to plan for yet</h3>
+  <p>A client calendar needs a client with at least one active project you can see.</p>
+</div></div>
+{% endif %}
+{% endblock %}

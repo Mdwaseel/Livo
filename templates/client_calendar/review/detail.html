@@ -1,0 +1,203 @@
+{% extends "client_calendar/review/_base.html" %}
+{% load static client_calendar_tags %}
+{% block title %}{{ activity.title }}{% endblock %}
+
+{% block content %}
+<nav class="rv-crumb" aria-label="Back">
+  <a href="{% url 'client_review:inbox' reviewer.token %}">{% cc_icon "chevron_left" %}All your approvals{% if waiting_elsewhere %} <span class="rv-count">{{ waiting_elsewhere }} more waiting</span>{% endif %}</a>
+</nav>
+
+{% if done == "approved" %}
+<div class="rv-flash is-ok" role="status">{% cc_icon "badge_check" %}<div><strong>Thank you — it's approved.</strong> The team has been told and will go ahead as planned. Nothing else is needed from you.</div></div>
+{% elif done == "changes" %}
+<div class="rv-flash" role="status">{% cc_icon "message" %}<div><strong>Thanks — your feedback is with the team.</strong> We'll send the updated version to you here for another look.</div></div>
+{% elif done == "late" %}
+<div class="rv-flash is-warn" role="status">{% cc_icon "alert" %}<div><strong>This had already been answered</strong> by someone else, or the team replaced it. Your answer wasn't recorded.</div></div>
+{% elif done == "stale" %}
+<div class="rv-flash is-warn" role="alert">{% cc_icon "refresh" %}<div><strong>Please choose your answer again.</strong> This page had been open for a while, so nothing was recorded yet.</div></div>
+{% elif done == "needs-feedback" %}
+<div class="rv-flash is-warn" role="alert">{% cc_icon "alert" %}<div><strong>Tell us what to change.</strong> Add a note below so the team knows what to fix.</div></div>
+{% endif %}
+
+{% if newer %}
+<div class="rv-flash" role="status">{% cc_icon "refresh" %}<div>There's a newer version of this. <a href="{% url 'client_review:detail' reviewer.token newer.pk %}">See version {{ newer.version }} &rarr;</a></div></div>
+{% endif %}
+
+<header class="rv-head">
+  <p class="cc-eyebrow">{% if approval.is_pending and not newer %}For your approval{% else %}Approval{% endif %} · {{ client.name }}</p>
+  <h1 class="rv-title">{{ activity.title }}</h1>
+  <div class="rv-chips">
+    <span class="cc-kind fam-{{ activity.family }}">{% cc_icon activity.kind_icon %}{{ activity.get_kind_display }}</span>
+    {% if activity.platform %}<span class="rv-chip">{% cc_icon activity.platform_icon %}{{ activity.get_platform_display }}</span>{% endif %}
+    <span class="rv-chip">{% cc_icon "calendar" %}Planned for {{ activity.date|date:"D, j M" }}{% if activity.time %}, {{ activity.time|time:"g:i A" }}{% endif %}</span>
+    {% if approval.version > 1 %}<span class="rv-chip">Version {{ approval.version }}</span>{% endif %}
+    {% if approval.is_pending and approval.respond_by and not newer %}
+    <span class="rv-chip {% if approval.is_overdue %}is-late{% else %}is-warn{% endif %}">{% cc_icon "clock" %}{% if approval.is_overdue %}Was due{% else %}Please reply by{% endif %} {{ approval.respond_by|date:"D, j M" }}</span>
+    {% endif %}
+  </div>
+</header>
+
+<div class="rv-layout">
+  <div class="rv-body">
+    {% if approval.message %}
+    <section class="rv-note" aria-label="Note from the team">
+      <span class="rv-avatar" aria-hidden="true"><img src="{% static 'img/mark.png' %}" alt="" width="26" height="26"></span>
+      <div>
+        <p class="rv-note-who">{% if approval.created_by %}{{ approval.created_by.get_full_name|default:approval.created_by.username }}{% else %}The team{% endif %} <span>· {{ agency.agency_name|default:"Livo Digital" }}</span></p>
+        <p class="rv-note-text">{{ approval.message|linebreaksbr }}</p>
+      </div>
+    </section>
+    {% endif %}
+
+    {% if approval.content %}
+    <section class="rv-card" aria-labelledby="rv-copy-h">
+      <header class="rv-card-h">
+        <h2 id="rv-copy-h">{% cc_icon "edit" %}Copy to approve</h2>
+        <button type="button" class="rv-textbtn" data-rv-copy="#rv-copy">{% cc_icon "copy" %}<span>Copy text</span></button>
+      </header>
+      <div class="rv-copy" id="rv-copy">{{ approval.content|linebreaks }}</div>
+    </section>
+    {% endif %}
+
+    {% if assets %}
+    <section class="rv-card" aria-labelledby="rv-files-h">
+      <header class="rv-card-h">
+        <h2 id="rv-files-h">{% cc_icon "image" %}Files &amp; links <span class="rv-count">{{ assets|length }}</span></h2>
+      </header>
+      <div class="rv-assets">
+        {% for asset in assets %}
+        {% url 'client_review:asset' reviewer.token approval.pk asset.pk as asset_url %}
+        {% if asset.is_image %}
+        <figure class="rv-media">
+          <a class="rv-media-frame" href="{{ asset_url }}" data-rv-zoom aria-label="View {{ asset.display_name }} full size">
+            <img src="{{ asset_url }}" alt="{{ asset.display_name }}" loading="lazy" decoding="async">
+            <span class="rv-zoom-hint" aria-hidden="true">{% cc_icon "zoom" %}</span>
+          </a>
+          <figcaption class="rv-media-cap"><span>{{ asset.display_name }}</span>
+            <a class="rv-textbtn" href="{{ asset_url }}?download=1">{% cc_icon "download" %}Download</a></figcaption>
+        </figure>
+        {% elif asset.is_video %}
+        <figure class="rv-media">
+          <div class="rv-media-frame is-video"><video controls playsinline preload="metadata" src="{{ asset_url }}"></video></div>
+          <figcaption class="rv-media-cap"><span>{{ asset.display_name }}</span>
+            <a class="rv-textbtn" href="{{ asset_url }}?download=1">{% cc_icon "download" %}Download</a></figcaption>
+        </figure>
+        {% elif asset.is_audio %}
+        <figure class="rv-media">
+          <audio controls preload="metadata" src="{{ asset_url }}"></audio>
+          <figcaption class="rv-media-cap"><span>{{ asset.display_name }}</span>
+            <a class="rv-textbtn" href="{{ asset_url }}?download=1">{% cc_icon "download" %}Download</a></figcaption>
+        </figure>
+        {% else %}
+        <div class="rv-file">
+          <span class="rv-file-ico" aria-hidden="true">{% cc_icon asset.icon %}</span>
+          <span class="rv-file-main">
+            <span class="rv-file-name">{{ asset.display_name }}</span>
+            <span class="rv-file-meta">{% if asset.is_link %}{{ asset.host }}{% else %}{{ asset.extension|upper }} file{% if asset.size_label %} · {{ asset.size_label }}{% endif %}{% endif %}</span>
+          </span>
+          {% if asset.is_link %}
+          <a class="cc-link" href="{{ asset.url }}" target="_blank" rel="noopener noreferrer">Open{% cc_icon "external" %}<span class="cc-sr"> {{ asset.display_name }} (opens in a new tab)</span></a>
+          {% else %}
+          {% if asset.is_pdf %}<a class="cc-link" href="{{ asset_url }}" target="_blank" rel="noopener">View<span class="cc-sr"> {{ asset.display_name }}</span></a>{% endif %}
+          <a class="cc-link" href="{{ asset_url }}?download=1">{% cc_icon "download" %}<span class="cc-sr">Download {{ asset.display_name }}</span></a>
+          {% endif %}
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if earlier %}
+    <section class="rv-card" aria-labelledby="rv-earlier-h">
+      <header class="rv-card-h"><h2 id="rv-earlier-h">{% cc_icon "undo" %}Earlier versions</h2></header>
+      <ul class="rv-earlier">
+        {% for old in earlier %}
+        <li>
+          <a href="{% url 'client_review:detail' reviewer.token old.pk %}">Version {{ old.version }}</a>
+          <span class="rv-badge {% if old.status == 'APPROVED' %}is-ok{% elif old.status == 'CHANGES' %}is-changes{% endif %}">{{ old.client_status_label }}</span>
+          {% if old.feedback %}<blockquote class="rv-quote">“{{ old.feedback|truncatechars:280 }}”{% if old.decided_by %} — {{ old.decided_by.name }}{% endif %}</blockquote>{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+  </div>
+
+  <aside class="rv-aside" id="decide">
+    {% if approval.is_pending and not newer %}
+    <form method="post" action="{% url 'client_review:decide' reviewer.token approval.pk %}" class="rv-decide" data-rv-decide data-decision="approve">
+      <input type="hidden" name="form_key" value="{{ form_key }}">{# not csrf_token: see views_review #}
+      <h2 class="rv-decide-h">Your decision</h2>
+      <p class="rv-decide-sub">Nothing is published until you approve.</p>
+      <fieldset class="rv-choice">
+        <legend class="cc-sr">Approve or request changes</legend>
+        <label class="rv-opt is-approve"><input type="radio" name="decision" value="approve" checked><span>{% cc_icon "check" %}Approve</span></label>
+        <label class="rv-opt is-changes"><input type="radio" name="decision" value="changes"><span>{% cc_icon "edit" %}Request changes</span></label>
+      </fieldset>
+      <label class="rv-flabel" for="rv-feedback">
+        <span data-when="approve">Anything to add? <em>optional</em></span>
+        <span data-when="changes" hidden>What should we change?</span>
+      </label>
+      <textarea id="rv-feedback" class="rv-textarea" name="feedback" rows="4" maxlength="5000"
+                placeholder="Optional — a note for the team." data-rv-feedback></textarea>
+      <button type="submit" class="cc-btn cc-btn-primary rv-block rv-submit" data-rv-submit>
+        <span data-when="approve">{% cc_icon "check" %}Approve</span>
+        <span data-when="changes" hidden>{% cc_icon "send" %}Send feedback</span>
+      </button>
+      <p class="rv-fineprint">Recorded as {{ reviewer.name }} ({{ reviewer.email }}).</p>
+    </form>
+    {% else %}
+    <div class="rv-outcome is-{{ approval.status|lower }}">
+      {% if approval.status == "APPROVED" %}
+        {% cc_icon "badge_check" "cc-ico rv-outcome-ico" %}
+        <h2>Approved</h2>
+        <p>{% if approval.decided_by %}by {{ approval.decided_by.name }} · {% endif %}{{ approval.decided_at|date:"j M Y, g:i A" }}</p>
+      {% elif approval.status == "CHANGES" %}
+        {% cc_icon "message" "cc-ico rv-outcome-ico" %}
+        <h2>Changes requested</h2>
+        <p>{% if approval.decided_by %}by {{ approval.decided_by.name }} · {% endif %}{{ approval.decided_at|date:"j M Y, g:i A" }}</p>
+      {% elif newer %}
+        {% cc_icon "refresh" "cc-ico rv-outcome-ico" %}
+        <h2>Replaced by version {{ newer.version }}</h2>
+        <p>The team sent an updated version.</p>
+      {% else %}
+        {% cc_icon "undo" "cc-ico rv-outcome-ico" %}
+        <h2>Withdrawn</h2>
+        <p>The team took this back. Nothing is needed from you.</p>
+      {% endif %}
+      {% if approval.feedback %}<blockquote class="rv-quote">{{ approval.feedback|linebreaksbr }}</blockquote>{% endif %}
+      {% if newer %}<a class="cc-btn cc-btn-primary rv-block" href="{% url 'client_review:detail' reviewer.token newer.pk %}">Open version {{ newer.version }}</a>{% endif %}
+    </div>
+    {% endif %}
+
+    {% if history %}
+    <section class="rv-history" aria-labelledby="rv-history-h">
+      <h2 class="rv-history-h" id="rv-history-h">History</h2>
+      <ol class="rv-timeline">
+        {% for event in history %}
+        <li class="rv-ev is-{{ event.kind|lower }}">
+          <span class="rv-ev-dot" aria-hidden="true"></span>
+          <div>
+            <p><strong>{{ event.get_kind_display }}</strong>{% if event.who %} · {{ event.who }}{% endif %}</p>
+            <time datetime="{{ event.created_at|date:'c' }}">{{ event.created_at|date:"j M, g:i A" }}</time>
+          </div>
+        </li>
+        {% endfor %}
+      </ol>
+    </section>
+    {% endif %}
+  </aside>
+</div>
+
+{% if approval.is_pending and not newer %}
+<div class="rv-dock" data-rv-dock>
+  <a class="cc-btn cc-btn-primary rv-block" href="#decide">{% cc_icon "check" %}Approve or request changes</a>
+</div>
+{% endif %}
+
+{# The image inside is created by client_review.js when a picture is opened. #}
+<dialog class="rv-lightbox" data-rv-lightbox aria-label="Full-size image">
+  <button type="button" class="cc-icon-btn rv-lightbox-close" data-rv-lightbox-close aria-label="Close">{% cc_icon "close" %}</button>
+</dialog>
+{% endblock %}

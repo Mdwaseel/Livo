@@ -1,0 +1,16 @@
+Hi {{ user.get_full_name|default:user.username }},
+
+Your Livo OS sign-in code is:
+
+    {{ code }}
+
+It expires in {{ minutes }} minutes and can be used once.
+
+Requested: {{ when }}
+From IP:   {{ ip }}
+
+If this wasn't you, do NOT share this code with anyone. Someone has your
+password — change it immediately at {{ site }} using "Forgot password?", and
+tell an administrator.
+
+-- Livo OS

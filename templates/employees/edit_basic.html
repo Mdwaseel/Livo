@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block crumb %}{% if is_self %}My profile{% else %}<a href="{% url 'employees:directory' %}">Employees</a> / <a href="{{ profile.get_absolute_url }}">{{ profile.display_name }}</a>{% endif %} / Edit{% endblock %}
+{% block content %}
+<div class="page-head"><div><h2>Edit profile</h2>
+  <p>{{ profile.display_name }} — contact details, photo and skills.</p></div></div>
+<form method="post" enctype="multipart/form-data" style="max-width:640px">
+  {% csrf_token %}
+  <div class="card"><div class="card-b">
+    <div class="field"><label>Photo</label><input type="file" name="photo" accept="image/*">
+      {% if profile.photo %}<div class="hint">Current: {{ profile.photo.name|cut:"employee_photos/" }}</div>{% endif %}</div>
+    <div class="row">
+      <div class="field"><label>Phone</label><input name="phone" value="{{ person.phone }}"></div>
+      <div class="field"><label>Personal email</label><input type="email" name="personal_email" value="{{ profile.personal_email }}"></div>
+    </div>
+    <div class="field"><label>Date of birth</label>
+      <input type="date" name="date_of_birth" value="{{ profile.date_of_birth|date:'Y-m-d' }}">
+      <div class="hint">Shows on the team calendar as a birthday. Only the day
+        and month are ever displayed — never the year.</div></div>
+    <div class="field"><label>Address</label><textarea name="address">{{ profile.address }}</textarea></div>
+    <div class="row">
+      <div class="field"><label>Emergency contact name</label><input name="emergency_contact_name" value="{{ profile.emergency_contact_name }}"></div>
+      <div class="field"><label>Emergency contact phone</label><input name="emergency_contact_phone" value="{{ profile.emergency_contact_phone }}"></div>
+    </div>
+    <div class="field"><label>Skills (comma-separated)</label>
+      <input name="skills" value="{{ skills_csv }}" placeholder="Django, Figma, SEO…"></div>
+  </div></div>
+  <div style="margin-top:16px;display:flex;gap:10px">
+    <button class="btn" type="submit">Save profile</button>
+    <a href="{{ profile.get_absolute_url }}" class="btn ghost">Cancel</a>
+  </div>
+</form>
+{% endblock %}

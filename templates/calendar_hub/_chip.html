@@ -1,0 +1,28 @@
+{% comment %}
+One event, compact — the month and week grids' unit.
+
+  {% include "calendar_hub/_chip.html" with event=event %}
+
+Three things every chip carries, none of them colour:
+  * the kind's marker glyph, and the kind's name inside the accessible label;
+  * the time, when it has one;
+  * a title attribute spelling out what it is, since a two-word chip in a month
+    cell is not self-explanatory.
+The tone class adds colour on top of that, never instead of it.
+
+`event.is_movable` has already been resolved against this viewer's permissions
+by services.collect — see the note there on why it isn't checked here.
+{% endcomment %}
+<a class="ev-chip tone-{{ event.kind_info.tone }}{% if event.is_overdue %} late{% endif %}"
+   href="{{ event.url }}"
+   {% if event.is_movable %}draggable="true" data-movable="1"
+   data-source="{{ event.source }}" data-id="{{ event.object_id }}"
+   data-date="{{ event.start_date|date:'Y-m-d' }}"
+   {% if event.occurrence_date %}data-occurrence="{{ event.occurrence_date|date:'Y-m-d' }}"{% endif %}
+   {% endif %}
+   title="{{ event.kind_info.label }}: {{ event.title }}{% if event.detail %} — {{ event.detail }}{% endif %}{% if event.status_label %} ({{ event.status_label }}){% endif %}">
+  <span class="marker" aria-hidden="true">{{ event.kind_info.marker }}</span>
+  {% if not event.is_all_day %}<span class="when">{{ event.start_time|time:"H:i" }}</span>{% endif %}
+  <span class="what">{{ event.title }}</span>
+  <span class="visually-hidden"> — {{ event.kind_info.label }}{% if event.is_overdue %}, overdue{% endif %}</span>
+</a>

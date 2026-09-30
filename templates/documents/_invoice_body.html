@@ -1,0 +1,116 @@
+{% comment %}
+The rendered body of a priced document (invoice / quotation).
+
+Written for the lowest common denominator of the two PDF engines: tables for
+layout and inline styles throughout, because xhtml2pdf — the Windows/dev
+fallback in pdf.py — supports neither flexbox nor grid nor external CSS. It
+looks the same in the browser preview, in WeasyPrint and in xhtml2pdf.
+
+Everything numeric here is precomputed by documents.pricing; this file never
+adds anything up.
+{% endcomment %}
+<h1 style="font-size:19pt;margin:0 0 2pt 0;letter-spacing:.5px">
+  {% if doc_type.slug == "invoice" %}TAX INVOICE{% else %}{{ doc_type.name|upper }}{% endif %}</h1>
+<p style="margin:0 0 12pt 0;color:#666666;font-size:9.5pt">
+  {{ agency.agency_name }}{% if agency.gstin %} · GSTIN {{ agency.gstin }}{% endif %}</p>
+
+<table style="width:100%;border-collapse:collapse;margin:0 0 14pt 0">
+  <tr>
+    <td style="width:50%;border:none;padding:0 10pt 0 0;vertical-align:top">
+      <div style="font-size:8.5pt;color:#888888;text-transform:uppercase;letter-spacing:.6px">
+        {% if doc_type.slug == "invoice" %}Billed to{% else %}Prepared for{% endif %}</div>
+      <div style="font-size:11pt;font-weight:bold;margin-top:2pt">{{ client.name }}</div>
+      {% if client.billing_address %}<div style="font-size:9.5pt;color:#444444;white-space:pre-line">{{ client.billing_address }}</div>{% endif %}
+      {% if client.city or client.state %}<div style="font-size:9.5pt;color:#444444">{{ client.city }}{% if client.city and client.state %}, {% endif %}{{ client.state }}</div>{% endif %}
+      {% if client.gstin %}<div style="font-size:9.5pt;color:#444444">GSTIN: {{ client.gstin }}</div>{% endif %}
+      {% if client.email %}<div style="font-size:9.5pt;color:#444444">{{ client.email }}</div>{% endif %}
+    </td>
+    <td style="width:50%;border:none;padding:0;vertical-align:top">
+      <table style="width:100%;border-collapse:collapse;font-size:9.5pt">
+        {% if document.number %}
+        <tr><td style="border:none;padding:1pt 0;color:#888888">{{ doc_type.name }} no.</td>
+            <td style="border:none;padding:1pt 0;text-align:right;font-weight:bold">{{ document.number }}</td></tr>
+        {% endif %}
+        <tr><td style="border:none;padding:1pt 0;color:#888888">Date</td>
+            <td style="border:none;padding:1pt 0;text-align:right">{% if issue_date %}{{ issue_date|date:"d M Y" }}{% else %}{{ document.created_at|date:"d M Y" }}{% endif %}</td></tr>
+        {% if due_date %}
+        <tr><td style="border:none;padding:1pt 0;color:#888888">Due</td>
+            <td style="border:none;padding:1pt 0;text-align:right">{{ due_date|date:"d M Y" }}</td></tr>
+        {% endif %}
+        {% if po_number %}
+        <tr><td style="border:none;padding:1pt 0;color:#888888">PO ref.</td>
+            <td style="border:none;padding:1pt 0;text-align:right">{{ po_number }}</td></tr>
+        {% endif %}
+        <tr><td style="border:none;padding:1pt 0;color:#888888">Project</td>
+            <td style="border:none;padding:1pt 0;text-align:right">{{ project.name }}</td></tr>
+      </table>
+    </td>
+  </tr>
+</table>
+
+<table style="width:100%;border-collapse:collapse;margin:0 0 10pt 0">
+  <thead>
+    <tr>
+      <th style="border:1px solid #cccccc;background-color:#f1f2f5;padding:5pt 7pt;font-size:9pt;text-align:left;width:6%">#</th>
+      <th style="border:1px solid #cccccc;background-color:#f1f2f5;padding:5pt 7pt;font-size:9pt;text-align:left">Description</th>
+      <th style="border:1px solid #cccccc;background-color:#f1f2f5;padding:5pt 7pt;font-size:9pt;text-align:right;width:12%">Qty</th>
+      <th style="border:1px solid #cccccc;background-color:#f1f2f5;padding:5pt 7pt;font-size:9pt;text-align:right;width:18%">Rate</th>
+      {% if totals.charge_gst %}<th style="border:1px solid #cccccc;background-color:#f1f2f5;padding:5pt 7pt;font-size:9pt;text-align:right;width:10%">{% if totals.gst_kind == "igst" %}IGST{% else %}GST{% endif %}</th>{% endif %}
+      <th style="border:1px solid #cccccc;background-color:#f1f2f5;padding:5pt 7pt;font-size:9pt;text-align:right;width:20%">Amount</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for item in items %}
+    <tr>
+      <td style="border:1px solid #cccccc;padding:5pt 7pt;font-size:9.5pt;text-align:left">{{ forloop.counter }}</td>
+      <td style="border:1px solid #cccccc;padding:5pt 7pt;font-size:9.5pt;text-align:left">{{ item.description }}</td>
+      <td style="border:1px solid #cccccc;padding:5pt 7pt;font-size:9.5pt;text-align:right">{{ item.qty_display }}{% if item.unit %} {{ item.unit }}{% endif %}</td>
+      <td style="border:1px solid #cccccc;padding:5pt 7pt;font-size:9.5pt;text-align:right">{{ item.unit_price_display }}</td>
+      {% if totals.charge_gst %}<td style="border:1px solid #cccccc;padding:5pt 7pt;font-size:9.5pt;text-align:right">{{ item.rate_display }}%</td>{% endif %}
+      <td style="border:1px solid #cccccc;padding:5pt 7pt;font-size:9.5pt;text-align:right">{{ item.amount_display }}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="{% if totals.charge_gst %}6{% else %}5{% endif %}" style="border:1px solid #cccccc;padding:12pt;font-size:9.5pt;text-align:center;color:#888888">
+      No line items yet — add them on the document page and this table fills in.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<table style="width:100%;border-collapse:collapse;margin:0 0 10pt 0">
+  <tr>
+    <td style="width:52%;border:none;padding:0"></td>
+    <td style="width:48%;border:none;padding:0">
+      <table style="width:100%;border-collapse:collapse;font-size:9.5pt">
+        <tr><td style="border:none;padding:2pt 0;color:#555555">Subtotal</td>
+            <td style="border:none;padding:2pt 0;text-align:right">{{ totals.subtotal_display }}</td></tr>
+        {% for group in totals.tax_groups %}{% for row in group.rows %}
+        <tr><td style="border:none;padding:2pt 0;color:#555555">{{ row.label }} <span style="color:#999999">on {{ group.taxable_display }}</span></td>
+            <td style="border:none;padding:2pt 0;text-align:right">{{ row.amount_display }}</td></tr>
+        {% endfor %}{% endfor %}
+        {% if not totals.charge_gst %}
+        <tr><td colspan="2" style="border:none;padding:2pt 0;color:#888888;font-size:8.5pt">No GST charged on this {{ doc_type.name|lower }}.</td></tr>
+        {% endif %}
+        <tr><td style="border:none;border-top:1pt solid #333333;padding:5pt 0;font-weight:bold;font-size:11pt">Total</td>
+            <td style="border:none;border-top:1pt solid #333333;padding:5pt 0;text-align:right;font-weight:bold;font-size:11pt">{{ totals.grand_total_display }}</td></tr>
+      </table>
+    </td>
+  </tr>
+</table>
+
+{% if totals.in_words %}
+<p style="margin:0 0 12pt 0;font-size:9.5pt"><span style="color:#888888">Amount in words:</span>
+  <strong>{{ totals.in_words }}</strong></p>
+{% endif %}
+
+{% if notes %}
+<div style="margin:0 0 10pt 0">
+  <div style="font-size:8.5pt;color:#888888;text-transform:uppercase;letter-spacing:.6px;margin-bottom:3pt">
+    {% if doc_type.slug == "invoice" %}Payment terms &amp; notes{% else %}Terms &amp; notes{% endif %}</div>
+  <div style="font-size:9.5pt;color:#333333;white-space:pre-line">{{ notes }}</div>
+</div>
+{% endif %}
+
+<p style="margin:14pt 0 0 0;padding-top:7pt;border-top:1pt solid #dddddd;font-size:8.5pt;color:#777777">
+  {{ agency.agency_name }}{% if agency.address %} · {{ agency.address|linebreaksbr }}{% endif %}{% if agency.email %} · {{ agency.email }}{% endif %}{% if agency.phone %} · {{ agency.phone }}{% endif %}
+  {% if doc_type.slug == "invoice" %}<br>This is a computer-generated invoice.{% endif %}
+</p>

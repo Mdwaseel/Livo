@@ -1,0 +1,23 @@
+# Never uploaded to Vercel. Secrets and local data first — anything uploaded
+# could end up inside the function bundle.
+.env
+/db.sqlite3
+media/
+# demo/livo_demo.sqlite3 IS uploaded on purpose — it is the demo's database,
+# built clean by `manage.py build_demo_db` (no data from db.sqlite3).
+.coverage
+
+# Local tooling and build output
+.venv/
+__pycache__/
+*.pyc
+staticfiles/
+.claude/
+.impeccable/
+.github/
+
+# VPS-only deploy scripts, design sources and archives
+deploy/
+design-system/
+*.zip
+images.png

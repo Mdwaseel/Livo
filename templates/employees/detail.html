@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+{% block crumb %}{% if is_self %}My profile{% else %}<a href="{% url 'employees:directory' %}">Employees</a> / {{ profile.display_name }}{% endif %}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="emp-head">
+    <div class="emp-avatar lg">
+      {% if profile.photo %}<img src="{{ profile.photo.url }}" alt="">{% else %}
+      <span>{{ profile.display_name|slice:":1"|upper }}</span>{% endif %}
+    </div>
+    <div>
+      <h2>{{ profile.display_name }}{% if is_self %} <span class="tag info">you</span>{% endif %}</h2>
+      <p>{{ person.designation.name|default:"" }}{% if person.department %} · {{ person.department.name }}{% endif %}
+        {% if person.employee_code %} · <span style="font-family:var(--mono)">{{ person.employee_code }}</span>{% endif %}</p>
+    </div>
+  </div>
+  <div class="page-actions">
+    {% if can_edit_basic %}
+    <a href="{% url 'employees:edit_basic' profile.pk %}" class="btn ghost">Edit profile</a>
+    {% endif %}
+    {% if can_edit_hr %}
+    <a href="{% url 'employees:edit_hr' profile.pk %}" class="btn">HR record</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid-2">
+  <div>
+    <div class="card" style="margin-bottom:18px">
+      <div class="card-h"><h3>Overview</h3>
+        <span class="tag {% if profile.status == 'ACTIVE' %}ok{% elif profile.status == 'PROBATION' %}info{% elif profile.status == 'NOTICE_PERIOD' or profile.status == 'ON_LEAVE' %}warn{% else %}danger{% endif %}">{{ profile.get_status_display }}</span></div>
+      <div class="card-b" style="padding:14px 20px">
+        <table class="finfo"><tbody>
+          <tr><td>Designation</td><td style="text-align:right">{{ person.designation.name|default:"—" }}</td></tr>
+          <tr><td>Department</td><td style="text-align:right">{{ person.department.name|default:"—" }}</td></tr>
+          <tr><td>Manager</td><td style="text-align:right">
+            {% if person.reports_to %}{{ person.reports_to.get_full_name|default:person.reports_to.username }}{% else %}—{% endif %}</td></tr>
+          <tr><td>Joined</td><td style="text-align:right">{{ profile.date_of_joining|date:"d M Y"|default:"—" }}</td></tr>
+          {% if profile.date_of_exit %}
+          <tr><td>Exit date</td><td style="text-align:right">{{ profile.date_of_exit|date:"d M Y" }}</td></tr>
+          {% endif %}
+          {% if person.primary_role %}
+          <tr><td>Role</td><td style="text-align:right"><span class="tag gray">{{ person.primary_role.name }}</span></td></tr>
+          {% endif %}
+        </tbody></table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:18px">
+      <div class="card-h"><h3>Contact</h3></div>
+      <div class="card-b" style="padding:14px 20px">
+        <table class="finfo"><tbody>
+          <tr><td>Work email</td><td style="text-align:right">{{ person.email|default:"—" }}</td></tr>
+          <tr><td>Phone</td><td style="text-align:right">{{ person.phone|default:"—" }}</td></tr>
+          <tr><td>Personal email</td><td style="text-align:right">{{ profile.personal_email|default:"—" }}</td></tr>
+          <tr><td>Address</td><td style="text-align:right">{{ profile.address|default:"—"|linebreaksbr }}</td></tr>
+          <tr><td>Emergency contact</td><td style="text-align:right">
+            {% if profile.emergency_contact_name %}{{ profile.emergency_contact_name }}{% if profile.emergency_contact_phone %} · {{ profile.emergency_contact_phone }}{% endif %}{% else %}—{% endif %}</td></tr>
+        </tbody></table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h3>Skills</h3></div>
+      <div class="card-b">
+        <div class="chip-row">
+        {% for s in profile.skills.all %}<span class="tag gray">{{ s.name }}</span>{% empty %}
+        <p style="color:var(--ink-soft)">No skills added yet.</p>{% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="align-self:start">
+    {% if show_sensitive %}
+    <div class="card sensitive" style="margin-bottom:18px">
+      <div class="card-h"><h3>Compensation &amp; bank</h3><span class="tag warn">payroll only</span></div>
+      <div class="card-b" style="padding:14px 20px">
+        <table class="finfo"><tbody>
+          <tr><td>Salary (monthly)</td><td style="text-align:right;font-family:var(--mono)">
+            <strong>{% if profile.salary %}₹{{ profile.salary|floatformat:"0g" }}{% else %}—{% endif %}</strong></td></tr>
+          <tr><td>Account name</td><td style="text-align:right">{{ profile.bank_account_name|default:"—" }}</td></tr>
+          <tr><td>Account number</td><td style="text-align:right;font-family:var(--mono)">{{ profile.bank_account_number|default:"—" }}</td></tr>
+          <tr><td>IFSC</td><td style="text-align:right;font-family:var(--mono)">{{ profile.bank_ifsc|default:"—" }}</td></tr>
+          {% if leave_balance %}
+          {# Next to the salary, because this is the number that reduces it. #}
+          <tr><td>Leave {{ leave_balance.year }}</td><td style="text-align:right">
+            {{ leave_balance.used|floatformat:"-1" }} of {{ leave_balance.allowed }} used
+            {% if leave_balance.over %}
+              · <span class="pill pill-over">{{ leave_balance.over|floatformat:"-1" }} over</span>
+            {% endif %}</td></tr>
+          {% endif %}
+        </tbody></table>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if show_docs %}
+    <div class="card" style="margin-bottom:18px">
+      <div class="card-h"><h3>Documents</h3></div>
+      <div class="card-b">
+        {% for d in documents %}
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line-2)">
+          <div>
+            {% comment %}
+            Both cases go through the download view so the permission check runs
+            before anyone learns the Drive URL.
+            {% endcomment %}
+            <a href="{% url 'employees:document_download' d.pk %}"
+               {% if d.is_link %}target="_blank" rel="noopener noreferrer"{% endif %}><strong>{{ d.get_doc_type_display }}</strong></a>
+            {% if d.is_link %}<span class="tag gray" title="Held on Drive, not on this server">link</span>{% endif %}
+            <div style="color:var(--ink-soft);font-size:12px">{{ d.filename|truncatechars:60 }}{% if d.notes %} · {{ d.notes }}{% endif %} · {{ d.created_at|date:"d M Y" }}</div>
+          </div>
+          {% if can_delete_doc %}
+          <form method="post" action="{% url 'employees:document_delete' d.pk %}"
+                onsubmit="return confirm('Delete this {{ d.get_doc_type_display|escapejs }}?')">
+            {% csrf_token %}<button type="submit" class="link-danger">Delete</button>
+          </form>
+          {% endif %}
+        </div>
+        {% empty %}<p style="color:var(--ink-soft)">No documents uploaded.</p>{% endfor %}
+
+        {% if can_upload %}
+        <form method="post" action="{% url 'employees:document_upload' profile.pk %}"
+              enctype="multipart/form-data" style="margin-top:14px;display:flex;flex-direction:column;gap:8px">
+          {% csrf_token %}
+          <div class="row">
+            <div class="field" style="margin:0"><label>Type</label>
+              <select name="doc_type">{% for value, label in doc_types %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></div>
+            <div class="field" style="margin:0"><label>File</label>
+              <input type="file" name="file" required>
+              <span class="upload-hint">Up to {{ max_upload_label }} · images are compressed automatically</span>
+            </div>
+          </div>
+          <div class="field" style="margin:0"><label>Notes</label><input name="notes" placeholder="Optional note"></div>
+          {% include "_drive_fallback.html" %}
+          <div><button class="btn sm" type="submit">Upload document</button></div>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if reports %}
+    <div class="card">
+      <div class="card-h"><h3>Direct reports</h3></div>
+      <div class="card-b">
+        {% for r in reports %}
+        <div style="padding:6px 0;border-bottom:1px solid var(--line-2)">
+          <a href="{{ r.get_absolute_url }}"><strong>{{ r.display_name }}</strong></a>
+          <span style="color:var(--ink-soft);font-size:12.5px"> {{ r.user.designation.name|default:"" }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% comment %}
+Below the record rather than beside it, and last on the page: these are the two
+buttons on this screen you cannot take back, and nothing is served by having
+them in the corner of your eye while you read somebody's address.
+{% endcomment %}
+{% if can_offboard or can_delete_employee %}
+<div class="card danger-zone">
+  <div class="card-h">
+    <h3>Remove {{ profile.display_name }}</h3>
+    {% if not person.is_active %}<span class="tag danger">Access revoked</span>{% endif %}
+  </div>
+  <div class="card-b">
+
+    {% if removal_blocker %}
+    <p class="dz-blocked">{{ removal_blocker }}</p>
+
+    {% elif not person.is_active %}
+    <div class="dz-row">
+      <div>
+        <strong>{{ profile.display_name }} can't sign in.</strong>
+        <p class="hint">Offboarded{% if profile.date_of_exit %} on
+          {{ profile.date_of_exit|date:"d M Y" }}{% endif %}. Everything they did
+          is still here — restoring access takes their old password, not a new
+          account.</p>
+      </div>
+      {% if can_offboard %}
+      <form method="post" action="{% url 'employees:reactivate' profile.pk %}">
+        {% csrf_token %}
+        <button class="btn ghost" type="submit">Restore access</button>
+      </form>
+      {% endif %}
+    </div>
+
+    {% elif can_offboard %}
+    <form method="post" action="{% url 'employees:offboard' profile.pk %}"
+          class="dz-form"
+          onsubmit="return confirm('Stop {{ profile.display_name|escapejs }} from signing in? Their records are kept, and you can restore access later.')">
+      {% csrf_token %}
+      <div>
+        <strong>Offboard — stop their access, keep their record</strong>
+        <p class="hint">Their login stops working immediately. Payslips, leave,
+          work logs and anything they wrote stay exactly where they are, and you
+          can undo this from this page.</p>
+      </div>
+      <div class="dz-fields">
+        <label class="dz-f">
+          <span>Reason</span>
+          <select name="status">
+            {% for value, label in exit_statuses %}
+            <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="dz-f">
+          <span>Last day</span>
+          <input type="date" name="date_of_exit" value="{{ today|date:'Y-m-d' }}">
+        </label>
+        <button class="btn warn" type="submit">Offboard</button>
+      </div>
+    </form>
+    {% endif %}
+
+    {% if can_delete_employee and not removal_blocker %}
+    <div class="dz-split">
+      <strong>Delete permanently</strong>
+      {% comment %}
+      Counted, not described in the abstract: "this deletes their records" is
+      easy to click past, and "this deletes 14 payslips" is not.
+      {% endcomment %}
+      <p class="hint">This erases {{ profile.display_name }} and
+        <b>{{ removal_impact.payslips }} payslip{{ removal_impact.payslips|pluralize }}</b>,
+        <b>{{ removal_impact.leave_records }} leave record{{ removal_impact.leave_records|pluralize }}</b>
+        and
+        <b>{{ removal_impact.hr_documents }} HR document{{ removal_impact.hr_documents|pluralize }}</b>.
+        Tasks, work logs and documents they wrote are kept, with the author left
+        blank. There is no undo{% if person.is_active %} — offboarding above does
+        what most people want{% endif %}.</p>
+      <form method="post" action="{% url 'employees:delete' profile.pk %}"
+            class="dz-fields" id="dz-delete">
+        {% csrf_token %}
+        <label class="dz-f dz-f-wide">
+          <span>Type <code>{{ person.username }}</code> to confirm</span>
+          <input name="confirm" autocomplete="off" placeholder="{{ person.username }}"
+                 data-dz-confirm="{{ person.username }}">
+        </label>
+        <button class="btn danger" type="submit" disabled>Delete permanently</button>
+      </form>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// The delete button stays dead until the username is typed exactly. The server
+// checks this too — this is only so the page answers before the round trip,
+// and so the button never looks ready when it isn't.
+(function () {
+  var form = document.getElementById("dz-delete");
+  if (!form) return;
+  var input = form.querySelector("[data-dz-confirm]");
+  var button = form.querySelector("button[type=submit]");
+  var expected = input.dataset.dzConfirm.toLowerCase();
+  input.addEventListener("input", function () {
+    button.disabled = input.value.trim().toLowerCase() !== expected;
+  });
+})();
+</script>
+{% endblock %}

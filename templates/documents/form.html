@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block crumb %}<a href="{{ project.get_absolute_url }}">{{ project.name }}</a> / New {{ doc_type.name }}{% endblock %}
+{% block content %}
+<div class="page-head"><div><h2>New {{ doc_type.name }}</h2>
+  {% if doc_type.is_priced %}
+  <p>Describe the work and its prices in the brief. The AI turns that into line
+     items you can edit, add to and delete — every total is then computed here,
+     never by the AI.</p>
+  {% else %}
+  <p>{{ doc_type.description|default:"Fill the brief — AI drafts it, you edit before export." }}</p>
+  {% endif %}</div></div>
+<form method="post" style="max-width:640px">
+  {% csrf_token %}
+  <div class="card"><div class="card-b">
+    <div class="field"><label>Document title</label>
+      <input name="title" placeholder="{{ doc_type.name }} - {{ project.client.name }}"></div>
+    {% for f in doc_type.form_schema %}
+      <div class="field">
+        <label>{{ f.label }}{% if f.required %} *{% endif %}</label>
+        {% if f.type == "textarea" %}
+          <textarea name="{{ f.name }}" {% if f.required %}required{% endif %}
+            placeholder="{{ f.placeholder|default:'' }}"></textarea>
+        {% elif f.type == "date" %}
+          <input type="date" name="{{ f.name }}" {% if f.required %}required{% endif %}>
+        {% elif f.type == "number" %}
+          <input type="number" step="any" name="{{ f.name }}" {% if f.required %}required{% endif %}
+            placeholder="{{ f.placeholder|default:'' }}">
+        {% else %}
+          <input name="{{ f.name }}" {% if f.required %}required{% endif %}
+            placeholder="{{ f.placeholder|default:'' }}">
+        {% endif %}
+        {% if f.hint %}<div class="hint">{{ f.hint }}</div>{% endif %}
+      </div>
+    {% empty %}
+      <div class="field"><label>Brief</label>
+        <textarea name="brief" placeholder="Describe what this document should cover…"></textarea>
+        <div class="hint">This type has no custom fields yet — add a form schema in admin to tailor it.</div></div>
+    {% endfor %}
+  </div></div>
+  <div style="margin-top:16px;display:flex;gap:10px">
+    <button class="btn" type="submit" id="gen-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.2 2.2M16.2 16.2l2.2 2.2M5.6 18.4l2.2-2.2M16.2 7.8l2.2-2.2"/></svg>
+      Generate draft</button>
+    <a href="{{ project.get_absolute_url }}" class="btn ghost">Cancel</a>
+  </div>
+</form>
+<script>
+  document.querySelector('form[method=post]').addEventListener('submit', () => {
+    const b = document.getElementById('gen-btn');
+    b.disabled = true;
+    b.textContent = 'Generating draft…';
+  });
+</script>
+{% endblock %}

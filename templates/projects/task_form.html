@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ task.title }} · Livo OS{% endblock %}
+{% block crumb %}<a href="{{ project.client.get_absolute_url }}">{{ project.client.name }}</a> / <a href="{{ project.get_absolute_url }}">{{ project.name }}</a> / <a href="{{ task.get_absolute_url }}">{{ task.title|truncatechars:30 }}</a> / Edit{% endblock %}
+{% block content %}
+<div class="page-head"><div><h2>Edit task</h2><p>{{ project.name }} · {{ project.client.name }}</p></div></div>
+<form method="post" style="max-width:700px">
+  {% csrf_token %}
+
+  <div class="card"><div class="card-b">
+    <div class="field"><label for="f-title">Title *</label>
+      <input name="title" id="f-title" required value="{{ task.title }}"></div>
+    <div class="field"><label for="f-desc">Description</label>
+      <textarea name="description" id="f-desc" rows="4">{{ task.description }}</textarea></div>
+  </div></div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="card-h"><h3>Workflow</h3></div>
+    <div class="card-b">
+      <div class="f-grid">
+        <div class="field"><label for="f-status">Status</label>
+          <select name="status" id="f-status">
+            {% for value, label in statuses %}
+              <option value="{{ value }}" {% if task.status == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          {% if task.reviewer %}
+          <p class="hint">This task has a reviewer — choosing “Done” submits it for review instead of completing it.</p>
+          {% endif %}
+        </div>
+        <div class="field"><label for="f-priority">Priority</label>
+          <select name="priority" id="f-priority">
+            {% for value, label in priorities %}
+              <option value="{{ value }}" {% if task.priority == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select></div>
+
+        <div class="field"><label for="f-assignee">Assignee</label>
+          <select name="assignee" id="f-assignee" {% if not can_assign %}disabled{% endif %}>
+            <option value="">Unassigned</option>
+            {% for u in team %}
+              <option value="{{ u.pk }}" {% if task.assignee_id == u.pk %}selected{% endif %}>{{ u.get_full_name|default:u.username }}</option>
+            {% endfor %}
+          </select>
+          {% if not can_assign %}<p class="hint">Reassigning needs the ‘assign’ permission on tasks.</p>{% endif %}
+        </div>
+        <div class="field"><label for="f-reviewer">Reviewer</label>
+          <select name="reviewer" id="f-reviewer" {% if not can_assign %}disabled{% endif %}>
+            <option value="">No review needed</option>
+            {% for u in team %}
+              <option value="{{ u.pk }}" {% if task.reviewer_id == u.pk %}selected{% endif %}>{{ u.get_full_name|default:u.username }}</option>
+            {% endfor %}
+          </select></div>
+
+        <div class="field"><label for="f-due">Due date</label>
+          <input type="date" name="due_date" id="f-due" value="{{ task.due_date|date:'Y-m-d' }}"></div>
+        <div class="field"><label for="f-dept">Department</label>
+          <select name="department" id="f-dept">
+            <option value="">No department</option>
+            {% for d in departments %}
+              <option value="{{ d.pk }}" {% if task.department_id == d.pk %}selected{% endif %}>{{ d.name }}</option>
+            {% endfor %}
+          </select></div>
+
+        <div class="field"><label for="f-sprint">Sprint</label>
+          <select name="sprint" id="f-sprint">
+            <option value="">No sprint</option>
+            {% for s in sprints %}
+              <option value="{{ s.pk }}" {% if task.sprint_id == s.pk %}selected{% endif %}>{{ s.name }}</option>
+            {% endfor %}
+          </select></div>
+        <div class="field"><label for="f-est">Estimated hours</label>
+          <input type="number" step="0.25" min="0" name="estimated_hours" id="f-est"
+                 value="{{ task.estimated_hours|default_if_none:'' }}"></div>
+      </div>
+
+      <label class="check-line">
+        <input type="checkbox" name="is_billable" {% if task.is_billable %}checked{% endif %}>
+        <span>Billable work</span>
+      </label>
+      <p class="hint">Actual hours ({{ task.actual_hours|floatformat:"-2" }} h) roll up from work logs and aren’t edited here.</p>
+    </div>
+  </div>
+
+  <div style="margin-top:16px;display:flex;gap:10px">
+    <button class="btn" type="submit">Save changes</button>
+    <a href="{{ task.get_absolute_url }}" class="btn ghost">Cancel</a>
+  </div>
+</form>
+{% endblock %}

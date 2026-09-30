@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block crumb %}My salary{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>My salary</h2>
+    <p>What you were paid each month, how it reached you, and anything that was
+       withheld.</p>
+  </div>
+</div>
+
+<div class="lv-balance">
+  <div class="lv-stat">
+    <b>₹{{ total_paid|floatformat:0 }}</b>
+    <span>Paid to date</span>
+  </div>
+  <div class="lv-stat">
+    <b>{{ balance.remaining|floatformat:"-1" }}</b>
+    <span>Leave days left of {{ balance.allowed }}</span>
+  </div>
+  {% if balance.over %}
+  <div class="lv-stat over">
+    <b>{{ balance.over|floatformat:"-1" }}</b>
+    <span>Days over allowance</span>
+  </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="card-h"><h3>Payment history</h3></div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Month</th>
+          <th style="text-align:right">Gross</th>
+          <th>Leave</th>
+          <th style="text-align:right">Deducted</th>
+          <th style="text-align:right">Received</th>
+          <th>Paid</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in records %}
+        <tr>
+          <td><strong>{{ r.month|date:"F Y" }}</strong></td>
+          <td style="text-align:right">₹{{ r.gross|floatformat:0 }}</td>
+          <td>
+            {% if r.leave_days_taken %}
+              {{ r.leave_days_taken|floatformat:"-1" }} day{{ r.leave_days_taken|pluralize }}
+              {% if r.excess_leave_days %}
+              <div><span class="pill pill-over">{{ r.excess_leave_days|floatformat:"-1" }} over allowance</span></div>
+              {% endif %}
+            {% else %}<span class="hint">None</span>{% endif %}
+          </td>
+          <td style="text-align:right">
+            {% if r.leave_deduction %}−₹{{ r.leave_deduction|floatformat:0 }}
+            {% else %}<span class="hint">—</span>{% endif %}
+            {% if r.adjustment %}
+            <div class="hint">
+              {% if r.adjustment > 0 %}+{% endif %}₹{{ r.adjustment|floatformat:0 }}
+              {% if r.adjustment_note %} · {{ r.adjustment_note }}{% endif %}
+            </div>
+            {% endif %}
+          </td>
+          <td style="text-align:right"><strong>₹{{ r.net_payable|floatformat:0 }}</strong></td>
+          <td>
+            {% if r.is_paid %}
+              <span class="pill pill-available">{{ r.paid_on|date:"d M Y" }}</span>
+              <div class="hint">{{ r.get_mode_display }}{% if r.reference %} · {{ r.reference }}{% endif %}</div>
+            {% else %}
+              <span class="pill pill-near">Pending</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="empty">
+          No salary records yet. They appear once payroll has been run.
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

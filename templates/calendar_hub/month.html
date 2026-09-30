@@ -1,0 +1,77 @@
+{% extends "calendar_hub/_base.html" %}
+
+{% block heading %}{{ window.title }}{% endblock %}
+{% block lede %}Tasks, milestones, deadlines, meetings, leave and birthdays across the agency.{% endblock %}
+
+{% block calendar %}
+{% comment %}
+The grid is a <table>: seven columns of dates with a header row is a table by
+any reading, and a screen reader gets column headers for free. It scrolls inside
+its own container on narrow screens rather than making the page scroll
+sideways.
+{% endcomment %}
+<div class="card cal-wrap">
+  <table class="cal-month">
+    <caption class="visually-hidden">{{ window.title }} — {{ total }} entries</caption>
+    <thead>
+      <tr>
+        <th scope="col"><abbr title="Monday">Mon</abbr></th>
+        <th scope="col"><abbr title="Tuesday">Tue</abbr></th>
+        <th scope="col"><abbr title="Wednesday">Wed</abbr></th>
+        <th scope="col"><abbr title="Thursday">Thu</abbr></th>
+        <th scope="col"><abbr title="Friday">Fri</abbr></th>
+        <th scope="col"><abbr title="Saturday">Sat</abbr></th>
+        <th scope="col"><abbr title="Sunday">Sun</abbr></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for week in weeks %}
+      <tr>
+        {% for cell in week %}
+        <td class="cal-cell{% if cell.is_today %} today{% endif %}{% if cell.is_other_month %} other{% endif %}{% if cell.is_weekend %} weekend{% endif %}"
+            data-drop-date="{{ cell.date|date:'Y-m-d' }}">
+          <div class="cal-daynum">
+            <a href="{% url 'calendar_hub:day' %}?{{ querystring }}{% if querystring %}&{% endif %}date={{ cell.date|date:'Y-m-d' }}"
+               aria-label="{{ cell.date|date:'l j F Y' }}{% if cell.total %}, {{ cell.total }} entr{{ cell.total|pluralize:'y,ies' }}{% else %}, nothing on{% endif %}">
+              {{ cell.date|date:"j" }}</a>
+            {% if cell.is_today %}<span class="tag ok">Today</span>{% endif %}
+          </div>
+          <div class="cal-chips" data-chip-slot>
+            {% for event in cell.events %}
+              {% include "calendar_hub/_chip.html" with event=event %}
+            {% endfor %}
+          </div>
+          {% if cell.hidden %}
+            {% comment %}
+            The cap is a display decision, never a data one — the count says how
+            many are behind it, so a busy day can't look like a quiet one.
+            {% endcomment %}
+            <a class="cal-more" data-open-day="{{ cell.date|date:'Y-m-d' }}"
+               data-day-label="{{ cell.date|date:'l j F Y' }}"
+               href="{% url 'calendar_hub:day_panel' on=cell.date|date:'Y-m-d' %}?{{ querystring }}">
+              +{{ cell.hidden }} more</a>
+          {% endif %}
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% include "calendar_hub/_strips.html" %}
+
+{% comment %}
+The lazily-loaded day panel. Empty and hidden until a "+n more" link is used.
+{% endcomment %}
+<div class="day-panel" id="cal-day-panel" hidden role="dialog" aria-modal="false"
+     aria-labelledby="cal-panel-title">
+  <div class="card">
+    <div class="card-h">
+      <h3 id="cal-panel-title" data-panel-title>Day</h3>
+      <button type="button" class="btn sm ghost" data-panel-close>Close</button>
+    </div>
+    <div class="card-b" data-panel-body></div>
+  </div>
+</div>
+{% endblock %}

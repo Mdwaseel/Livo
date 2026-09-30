@@ -1,0 +1,70 @@
+{% comment %}
+One activity, one change, sent the moment the team saves it — "it's live,
+here's the link". Client-facing and light like the other client emails; table
+layout and inline styles only.
+{% endcomment %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f5f4;padding:28px 12px;font-family:Segoe UI,Helvetica,Arial,sans-serif">
+  <tr><td align="center">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px">
+      <tr><td style="padding:0 4px 14px;font-size:14px;font-weight:700;color:#141a17">{{ agency_name }}</td></tr>
+    </table>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #e0e3e2;border-radius:16px">
+      <tr><td style="padding:28px 28px 4px">
+        <div style="display:inline-block;padding:5px 11px;border-radius:999px;font-size:12px;font-weight:700;{% if kind == 'DONE' %}background:#e1f3e9;color:#11794a{% elif kind == 'POSTPONED' %}background:#eef0ef;color:#4c5450{% else %}background:#dff5ea;color:#00614a{% endif %}">{{ label }}</div>
+        <h1 style="margin:14px 0 8px;font-size:22px;line-height:1.3;color:#141a17;font-weight:800">{{ activity.title }}</h1>
+        <p style="margin:0;color:#4c5450;font-size:15px;line-height:1.6">
+          Hi {{ reviewer.first_name }},
+          {% if kind == 'DONE' %}this is now {{ label|lower }}{% if activity.link %} — have a look{% endif %}.
+          {% elif kind == 'MOVED' %}we've moved this to a new date.
+          {% elif kind == 'POSTPONED' %}we've postponed this for now.
+          {% elif kind == 'RESUMED' %}this is back on the plan.
+          {% elif kind == 'ADDED' %}we've added this to your content calendar.
+          {% else %}here's an update on this.{% endif %}
+        </p>
+      </td></tr>
+
+      {% if note %}
+      <tr><td style="padding:16px 28px 0">
+        <div style="background:#dff5ea;border-radius:12px;padding:13px 16px;color:#141a17;font-size:14.5px;line-height:1.6">
+          {{ note|linebreaksbr }}{% if actor %}<div style="margin-top:6px;color:#4c5450;font-size:12.5px">— {{ actor.get_full_name|default:actor.username }}, {{ agency_name }}</div>{% endif %}
+        </div>
+      </td></tr>
+      {% endif %}
+
+      {% if preview_url %}
+      <tr><td style="padding:18px 28px 0">
+        <img src="{{ preview_url }}" alt="Preview of {{ activity.title }}" width="504" style="display:block;width:100%;max-width:504px;height:auto;border-radius:12px;background:#eef0ef">
+      </td></tr>
+      {% endif %}
+
+      <tr><td style="padding:18px 28px 0">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:13.5px;color:#6e7672;background:#f8f9f8;border:1px solid #ebedec;border-radius:12px">
+          <tr><td style="padding:12px 16px 4px">What</td>
+              <td align="right" style="padding:12px 16px 4px;color:#141a17;font-weight:600">{{ activity.get_kind_display }}{% if activity.platform %} &middot; {{ activity.get_platform_display }}{% endif %}</td></tr>
+          <tr><td style="padding:4px 16px">When</td>
+              <td align="right" style="padding:4px 16px;color:#141a17;font-weight:600">{% if move %}<span style="color:#8f9592;font-weight:400;text-decoration:line-through">{{ move.old_date|date:"D j M" }}</span> &rarr; {% endif %}{{ activity.date|date:"D, j M Y" }}{% if activity.time %}, {{ activity.time|time:"g:i A" }}{% endif %}</td></tr>
+          <tr><td style="padding:4px 16px 12px">Status</td>
+              <td align="right" style="padding:4px 16px 12px;color:#141a17;font-weight:600">{{ activity.client_status_label }}</td></tr>
+        </table>
+      </td></tr>
+
+      {% if activity.details %}
+      <tr><td style="padding:16px 28px 0">
+        <p style="margin:0;color:#4c5450;font-size:14px;line-height:1.6">{{ activity.details|truncatechars:400|linebreaksbr }}</p>
+      </td></tr>
+      {% endif %}
+
+      <tr><td style="padding:22px 28px 6px">
+        {% if activity.link %}<a href="{{ activity.link }}" style="display:inline-block;margin:0 8px 8px 0;background:#00795b;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;padding:13px 22px;border-radius:10px">{% if kind == 'DONE' %}View it{% else %}Open the link{% endif %}</a>{% endif %}
+        {% if calendar_url %}<a href="{{ calendar_url }}" style="display:inline-block;margin:0 0 8px;{% if activity.link %}background:#ffffff;color:#00614a;border:1px solid #d5dcd9;padding:12px 20px{% else %}background:#00795b;color:#ffffff;padding:13px 22px{% endif %};font-size:15px;font-weight:700;text-decoration:none;border-radius:10px">Open your calendar</a>{% endif %}
+      </td></tr>
+
+      <tr><td style="padding:10px 28px 26px">
+        <p style="margin:0;color:#8f9592;font-size:12.5px;line-height:1.6">
+          Sent by {{ agency_name }} for {{ client.name }}. Reply to this email with any questions.
+          {% if prefs_url %}<a href="{{ prefs_url }}" style="color:#4c5450">Email preferences</a>.{% endif %}
+        </p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>

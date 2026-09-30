@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% load static client_calendar_tags %}
+{% block title %}{{ client.name }} · Client calendar · Livo OS{% endblock %}
+{% block head %}<link rel="stylesheet" href="{% static 'css/client_calendar.css' %}">{% endblock %}
+{% block crumb %}<a href="{% url 'client_calendar:index' %}">Client calendars</a> / {{ client.name }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>{{ client.name }}</h2>
+    <p>Plan what the client sees — posts, stories, ad changes and reports.
+      <a href="{{ client.get_absolute_url }}" style="color:var(--primary);font-weight:600">Client record &rarr;</a></p>
+  </div>
+  <div class="page-actions">
+    <a class="btn ghost" href="{% url 'client_calendar:approvals' %}?client={{ client.pk }}">
+      {% cc_icon "badge_check" "" %}<span>Approvals{% if approvals_waiting %} · {{ approvals_waiting }} waiting{% endif %}</span></a>
+    {% if link and link.is_active %}
+    <a class="btn ghost" href="{{ share_url }}" target="_blank" rel="noopener">
+      {% cc_icon "external" "" %}<span>See the client's view</span></a>
+    {% endif %}
+    {% if can_plan %}
+    <a class="btn" href="{% url 'client_calendar:activity_create' client.pk %}?date={% if is_current_month %}{{ today|date:'Y-m-d' }}{% else %}{{ window.start|date:'Y-m-d' }}{% endif %}">
+      {% cc_icon "plus" "" %}<span>Add activity</span></a>
+    {% endif %}
+  </div>
+</div>
+
+{% comment %}
+The link sits above the calendar rather than in a settings screen: sharing it is
+the whole point of planning here, and its state (off, never opened, opened
+yesterday) is something to notice every time the page is opened.
+{% endcomment %}
+<section class="card cc-share" id="share" aria-labelledby="cc-share-h">
+  <div class="cc-share-ico">{% cc_icon "link" %}</div>
+  <div class="cc-share-main">
+    {% if link and link.is_active %}
+      <h3 id="cc-share-h">Client share link <span class="tag ok"><span class="dot"></span>Live</span></h3>
+      <p class="hint">Anyone with this link sees {{ client.name }}'s calendar — only activities marked visible to the client, never internal notes.
+        {% if link.view_count %}Opened {{ link.view_count }} time{{ link.view_count|pluralize }}, most recently {{ link.last_viewed_at|cc_ago }}.{% else %}The client hasn't opened it yet.{% endif %}</p>
+      <div class="cc-share-row">
+        <input class="cc-share-url" type="text" readonly value="{{ share_url }}" aria-label="Client share link" data-cc-copy-source onclick="this.select()">
+        <button type="button" class="btn sm" data-cc-copy>{% cc_icon "copy" "" %}<span data-cc-copy-label>Copy link</span></button>
+        <a class="btn sm ghost" href="https://wa.me/?text={{ 'Here is your content calendar: '|urlencode }}{{ share_url|urlencode:'' }}" target="_blank" rel="noopener noreferrer">Send on WhatsApp</a>
+      </div>
+      {% if can_share %}
+      <div class="cc-share-actions">
+        <form method="post" action="{% url 'client_calendar:link_action' client.pk %}"
+              onsubmit="return confirm('Replace the link? The current one stops working immediately and you will need to send the client the new one.')">
+          {% csrf_token %}<input type="hidden" name="action" value="rotate">
+          <button type="submit" class="link-act muted">{% cc_icon "refresh" %}Replace link</button>
+        </form>
+        <form method="post" action="{% url 'client_calendar:link_action' client.pk %}"
+              onsubmit="return confirm('Turn the link off? The client will see that it is no longer active. You can turn it back on later.')">
+          {% csrf_token %}<input type="hidden" name="action" value="disable">
+          <button type="submit" class="link-act muted">Turn off</button>
+        </form>
+      </div>
+      {% endif %}
+    {% elif link %}
+      <h3 id="cc-share-h">Client share link <span class="tag gray">Off</span></h3>
+      <p class="hint">The link is switched off, so the client sees a “no longer active” page. Turning it back on restores the same URL.</p>
+      {% if can_share %}
+      <form method="post" action="{% url 'client_calendar:link_action' client.pk %}" class="cc-share-row">
+        {% csrf_token %}<input type="hidden" name="action" value="enable">
+        <button type="submit" class="btn sm">Turn the link back on</button>
+      </form>
+      {% endif %}
+    {% else %}
+      <h3 id="cc-share-h">Share this calendar with {{ client.name }}</h3>
+      <p class="hint">Create a private link the client can open on any phone or laptop — no login. It shows this calendar as it stands, and updates the moment you change something.</p>
+      {% if can_share %}
+      <form method="post" action="{% url 'client_calendar:link_action' client.pk %}" class="cc-share-row">
+        {% csrf_token %}<input type="hidden" name="action" value="create">
+        <button type="submit" class="btn sm">{% cc_icon "link" "" %}<span>Create share link</span></button>
+      </form>
+      {% else %}
+      <p class="hint">Ask someone who can edit clients to create the link.</p>
+      {% endif %}
+    {% endif %}
+  </div>
+</section>
+
+{% comment %}
+Who gets told when this calendar changes. Next to the link, because the link is
+where they look and these emails are what bring them back to it.
+{% endcomment %}
+<section class="card cc-share cc-updates" id="updates" aria-labelledby="cc-updates-h">
+  <div class="cc-share-ico">{% cc_icon "email" %}</div>
+  <div class="cc-share-main">
+    <h3 id="cc-updates-h">Update emails</h3>
+    <p class="hint">When you add, move, publish or postpone something here, these people get one short email listing the changes — batched, never an email per edit. Hidden items are never mentioned.{% if not link or not link.is_active %} <strong>Emails start once the share link is live.</strong>{% endif %}</p>
+    <form method="post" action="{% url 'client_calendar:update_subscribers' client.pk %}" class="cc-subs-form">
+      {% csrf_token %}
+      {% if update_people %}
+      <ul class="cc-subs">
+        {% for person in update_people %}
+        <li class="cc-sub">
+          <span class="cc-sub-avatar" aria-hidden="true">{{ person.name|slice:":1"|upper }}</span>
+          <span class="cc-sub-main">
+            <strong>{{ person.name }}</strong>
+            <small>{% if person.unsubscribed %}Unsubscribed themselves — only they can turn this back on{% else %}{{ person.email }}{% if person.last_sent %} · last emailed {{ person.last_sent|cc_ago }}{% endif %}{% endif %}</small>
+          </span>
+          <label class="cc-sr" for="sub-{{ person.value }}">How often {{ person.name }} gets update emails</label>
+          <select id="sub-{{ person.value }}" name="freq_{{ person.value }}" class="cc-sub-freq{% if person.frequency != 'OFF' %} is-on{% endif %}"{% if not can_share or person.unsubscribed %} disabled{% endif %}>
+            {% for value, label in update_frequencies %}<option value="{{ value }}"{% if person.frequency == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+      {% if can_share %}
+      <div class="cc-sub-new">
+        <input name="new_name" placeholder="Name" aria-label="Name" autocomplete="off">
+        <input name="new_email" type="email" multiple placeholder="{% if update_people %}Add others — emails, comma-separated{% else %}name@company.com, another@company.com{% endif %}" aria-label="Email addresses, separated by commas" autocomplete="off">
+        <input type="hidden" name="new_frequency" value="SOON">
+      </div>
+      <button type="submit" class="btn sm">Save</button>
+      {% endif %}
+    </form>
+  </div>
+</section>
+
+<div class="cc cc-planner" data-cc data-view="{{ filters.view }}">
+  {% include "client_calendar/_view_boot.html" %}
+  {% include "client_calendar/_calendar.html" %}
+</div>
+{% endblock %}
+
+{% block scripts %}<script src="{% static 'js/client_calendar.js' %}" defer></script>{% endblock %}

@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block crumb %}Workspaces{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>Workspaces</h2>
+    <p>Each workspace is a separate world: its own clients, projects, documents,
+       money and charts. People only ever see the workspace they are in — you are
+       the exception, and the switcher in the top bar is how you look across.</p>
+  </div>
+  <a href="{% url 'core:workspace_create' %}" class="btn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    <span class="lbl">New workspace</span></a>
+</div>
+
+<div class="ws-grid">
+  {% for w in workspaces %}
+  <div class="ws-card" style="--ws-color:{{ w.color }}">
+    <h3>{{ w.name }}
+      {% if w.is_home %}<span class="pill ok">Yours</span>
+      {% elif not w.is_active %}<span class="pill">Inactive</span>{% endif %}
+    </h3>
+    <div class="ws-meta">
+      {% if w.is_home %}Your agency. Everything created before partner access
+        lives here, and it can't be switched off.
+      {% else %}Partner workspace{% if w.notes %} · {{ w.notes|truncatewords:12 }}{% endif %}{% endif %}
+    </div>
+    <div class="ws-stats">
+      <div><b>{{ w.people }}</b><span>People</span></div>
+      <div><b>{{ w.client_count }}</b><span>Clients</span></div>
+      <div><b>{{ w.project_count }}</b><span>Projects</span></div>
+    </div>
+    <a href="{% url 'core:workspace_edit' w.pk %}" class="btn ghost sm">Edit</a>
+  </div>
+  {% empty %}
+  <p class="empty">No workspaces yet.</p>
+  {% endfor %}
+</div>
+
+{% comment %}
+Assignment lives here rather than on each person's profile: which workspace
+somebody is in decides everything they can see, so it belongs on the screen that
+shows what each workspace holds — with the counts above it — where the whole
+picture is reviewable at once instead of one profile at a time.
+{% endcomment %}
+<div class="card" style="margin-top:22px">
+  <div class="card-h"><h3>Who is in which workspace</h3></div>
+  <div class="card-b">
+    <p class="hint" style="margin-bottom:14px">
+      Moving somebody changes what they can see the next time they load a page.
+      It does not change who can see <em>them</em> — the employee directory is
+      shared across every workspace.
+    </p>
+    <form method="post" action="{% url 'core:workspace_assign' %}">
+      {% csrf_token %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Person</th><th>Role</th><th style="width:220px">Workspace</th></tr></thead>
+          <tbody>
+            {% for person in people %}
+            <tr>
+              <td>
+                <strong>{{ person.get_full_name|default:person.username }}</strong>
+                {% if person.pk == user.pk %}<span class="hint"> · you</span>{% endif %}
+              </td>
+              <td class="hint">{{ person.primary_role.name|default:"—" }}</td>
+              <td>
+                {% if person.pk == user.pk %}
+                  {# Moving yourself out of home would revoke this very screen. #}
+                  <span class="hint">{{ person.workspace.name|default:"—" }} (can't move yourself)</span>
+                {% else %}
+                <select name="ws_{{ person.pk }}" aria-label="Workspace for {{ person.get_full_name|default:person.username }}">
+                  {% for w in workspaces %}
+                  <option value="{{ w.pk }}" {% if person.workspace_id == w.pk %}selected{% endif %}>
+                    {{ w.name }}{% if w.is_home %} (yours){% endif %}</option>
+                  {% endfor %}
+                </select>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:14px"><button class="btn" type="submit">Save assignments</button></div>
+    </form>
+  </div>
+</div>
+{% endblock %}

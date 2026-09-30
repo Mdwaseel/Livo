@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block crumb %}<a href="{% url 'clients:list' %}">Clients</a> / {% if client %}<a href="{{ client.get_absolute_url }}">{{ client.name }}</a> / Edit{% else %}New{% endif %}{% endblock %}
+{% block content %}
+<div class="page-head"><div>
+  {% if client %}
+  <h2>Edit client</h2><p>Update {{ client.name }}'s details.</p>
+  {% else %}
+  <h2>New client</h2><p>A default project is created automatically.</p>
+  {% endif %}
+</div></div>
+<form method="post"><div class="grid-2">
+  {% csrf_token %}
+  <div class="card"><div class="card-h"><h3>Company details</h3></div><div class="card-b">
+    <div class="field"><label>Client / company name *</label><input name="name" required value="{{ client.name|default:'' }}"></div>
+    <div class="row">
+      <div class="field"><label>Email</label><input name="email" type="email" value="{{ client.email|default:'' }}"></div>
+      <div class="field"><label>Phone</label><input name="phone" value="{{ client.phone|default:'' }}"></div>
+    </div>
+    <div class="field"><label>Website</label><input name="website" value="{{ client.website|default:'' }}"></div>
+    <div class="row">
+      <div class="field"><label>City</label><input name="city" value="{{ client.city|default:'' }}"></div>
+      <div class="field"><label>State</label><input name="state" value="{{ client.state|default:'' }}"></div>
+    </div>
+    <div class="field"><label>GSTIN</label><input name="gstin" value="{{ client.gstin|default:'' }}"></div>
+    <div class="field"><label>Billing address</label><textarea name="billing_address">{{ client.billing_address|default:'' }}</textarea></div>
+    <div class="field"><label>Notes</label><textarea name="notes">{{ client.notes|default:'' }}</textarea></div>
+  </div></div>
+  <div>
+    <div class="card"><div class="card-h"><h3>Primary contact</h3></div><div class="card-b">
+      <div class="field"><label>Name</label><input name="contact_name" value="{{ contact.name|default:'' }}"></div>
+      <div class="field"><label>Designation</label><input name="contact_designation" value="{{ contact.designation|default:'' }}"></div>
+      <div class="field"><label>Email</label><input name="contact_email" type="email" value="{{ contact.email|default:'' }}"></div>
+      <div class="field"><label>Phone</label><input name="contact_phone" value="{{ contact.phone|default:'' }}"></div>
+    </div></div>
+    <div style="margin-top:16px;display:flex;gap:10px">
+      <button class="btn" type="submit">{% if client %}Save changes{% else %}Create client{% endif %}</button>
+      <a href="{% if client %}{{ client.get_absolute_url }}{% else %}{% url 'clients:list' %}{% endif %}" class="btn ghost">Cancel</a>
+    </div>
+  </div>
+</div></form>
+{% endblock %}
