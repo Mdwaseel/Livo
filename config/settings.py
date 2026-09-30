@@ -86,7 +86,8 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     # Right after SecurityMiddleware, per WhiteNoise's docs, so static files
-    # skip everything below. The only static server on Vercel.
+    # skip everything below. Serves /static/ wherever nothing else does
+    # (`vercel dev`, a bare gunicorn); deployed Vercel serves it from its CDN.
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -182,10 +183,10 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 # only exists after collectstatic, and requiring that in dev would turn every
 # edit into a build step.
 if ON_VERCEL:
-    # No collectstatic step runs on Vercel, so there is no manifest to hash
-    # against. WhiteNoise serves straight from the app and static/ directories
-    # via the finders instead, with a short cache lifetime standing in for
-    # hashed filenames: a CSS change reaches every browser within a minute.
+    # Vercel runs collectstatic itself during the build and serves the result
+    # from its CDN. Plain StaticFilesStorage rather than the Manifest variant:
+    # a missing manifest at runtime would turn every {% static %} into a 500.
+    # With USE_FINDERS, Vercel collects straight from the app directories.
     STORAGES = {
         "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
         "staticfiles": {
